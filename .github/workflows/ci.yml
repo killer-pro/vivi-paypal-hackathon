@@ -15,6 +15,9 @@ jobs:
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U vv" --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
     env:
       PGPASSWORD: vv
     defaults:
@@ -31,7 +34,7 @@ jobs:
         run: |
           psql -h localhost -U vv -d video_virale_test -c "CREATE DATABASE video_virale_mig"
           docker run -d --name minio -p 9100:9000 -e RUSTFS_ACCESS_KEY=minioadmin -e RUSTFS_SECRET_KEY=minioadmin \
-            rustfs/rustfs:latest
+            rustfs/rustfs@sha256:ed9210d6411d77ffceb70d94b964a3cb7d225983368bc25bebe01e995293dcc2
       - run: uv run --frozen ruff check app tests
       - run: uv run --frozen mypy app
       - run: uv run --frozen pytest -q

@@ -11,7 +11,7 @@ services:
     ports: ["127.0.0.1:6379:6379"]
   minio:
     # MinIO n'est plus publié sur Docker Hub : RustFS offre la même API S3 (service gardé sous le nom « minio »).
-    image: rustfs/rustfs:latest
+    image: rustfs/rustfs@sha256:ed9210d6411d77ffceb70d94b964a3cb7d225983368bc25bebe01e995293dcc2
     environment: { RUSTFS_ACCESS_KEY: minioadmin, RUSTFS_SECRET_KEY: minioadmin }
     ports: ["127.0.0.1:9100:9000"]
     volumes: [miniodata:/data]
