@@ -5,6 +5,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.app_settings import AppSettings
+from app.config import settings
 from app.models import Asset, MusicTrack, Project, ProviderCall, Scene, Step
 from app.providers.base import GenerationResult, ProviderError, TextResult
 from app.providers.fakes import FakeVideo
@@ -362,7 +363,8 @@ async def test_clips_single_scene_uses_step_params(session, ctx):
     assert call.model == "wan"
 
 
-async def test_voice_without_voice_id_fails(session, ctx):
+async def test_voice_without_voice_id_fails(session, ctx, monkeypatch):
+    monkeypatch.setattr(settings, "fake_providers", False)  # le mode factice a une voix par défaut
     p = await seed(session)
     await set_running(session, "voice")
     session.add(Scene(project_id=p.id, position=1, voice_text="a", visual_prompt="b", duration_s=3))
@@ -1460,7 +1462,8 @@ async def test_a_speaker_voice_wins_over_the_step_voice_param_for_that_scene_onl
     assert sorted(voice.calls) == [("t1", "step"), ("t2", "v-chloe")]
 
 
-async def test_voice_fails_before_any_call_when_a_scene_has_no_voice_at_all(session, ctx):
+async def test_voice_fails_before_any_call_when_a_scene_has_no_voice_at_all(session, ctx, monkeypatch):
+    monkeypatch.setattr(settings, "fake_providers", False)
     p, voice = await seed_voices(session, ctx, ["", "chloe"], {"chloe": "v-chloe"}, default="")
     await run_step(ctx, p.id, "voice")
     step = await get_step(session, p.id, "voice")
