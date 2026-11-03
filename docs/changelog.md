@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-11-03 (dépôt public)
+- Webhook PayPal essayé de bout en bout par un tunnel Cloudflare (événement signé livré, crédit unique) ; procédure dans `paiement.md`.
 - Dépôt public `vivi-paypal-hackathon` (sans docs de stratégie ni historique). Essai d'un clone neuf : vidéo complète en mode factice. Corrigés : identifiants PayPal saisis prioritaires sur le faux (faux partagé entre requêtes), voix par défaut en mode factice. Dépôt public seulement : RustFS remplace MinIO (retiré de Docker Hub), Redis ajouté à la CI.
 
 ## 2026-11-02 (docs et deck)

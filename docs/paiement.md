@@ -68,3 +68,9 @@ d'approbation ; PayPal renvoie sur `/credits?paypal=success&token=<commande>` ; 
 qui capture et crédite. Le webhook `PAYMENT.CAPTURE.COMPLETED` (signature vérifiée par l'API PayPal) est le filet : même
 identifiant de capture (`paypal:<id>` dans `stripe_events`), donc jamais de double crédit. Une capture n'est créditée que si
 son statut est `COMPLETED`, son montant celui du pack (USD) et son compte celui du `custom_id` ; `403` si la commande est celle d'un autre compte. Une capture déjà faite (PayPal : `ORDER_ALREADY_CAPTURED`) répond `{"credited": 0}` et non une erreur ; l'identifiant de commande est validé (`[A-Za-z0-9_-]{1,64}`) avant d'entrer dans l'URL appelée avec nos identifiants. L'écran ne capture qu'une fois par commande.
+
+**Brancher le webhook (essayé en bac à sable).** PayPal doit joindre l'API : `cloudflared tunnel --url http://localhost:8000` donne une
+adresse `https://….trycloudflare.com` (elle change à chaque lancement). Créer le webhook sur cette adresse + `/api/paypal/webhook`
+pour l'événement `PAYMENT.CAPTURE.COMPLETED` (tableau de bord développeur, ou `POST /v1/notifications/webhooks`), puis saisir son
+identifiant dans Réglages (`paypal_webhook_id`). Essai : commande approuvée, capture de l'écran bloquée, capture faite côté serveur ;
+PayPal a livré l'événement signé en moins d'une minute et les 200 crédits sont arrivés une seule fois.
