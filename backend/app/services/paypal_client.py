@@ -123,11 +123,15 @@ class FakePayPal:
         return self.webhook_valid
 
 
+_FAKE = FakePayPal()  # un seul faux pour tout le processus : une commande créée par une requête se capture dans la suivante
+
+
 async def get_paypal(session: AsyncSession = Depends(get_session)) -> PayPalAPI:
-    if settings.fake_providers:
-        return FakePayPal()
+    """Les identifiants saisis dans les Réglages priment ; sans eux, le faux n'est servi qu'en mode `FAKE_PROVIDERS`."""
     app_settings = AppSettings(session)
     client_id, secret = await app_settings.get("paypal_client_id"), await app_settings.get("paypal_client_secret")
-    if not (client_id and secret):
-        raise HTTPException(503, "PayPal n'est pas configuré (identifiants absents des Réglages)")
-    return PayPalClient(client_id, secret, await app_settings.get("paypal_webhook_id"), await app_settings.get("paypal_mode"))
+    if client_id and secret:
+        return PayPalClient(client_id, secret, await app_settings.get("paypal_webhook_id"), await app_settings.get("paypal_mode"))
+    if settings.fake_providers:
+        return _FAKE
+    raise HTTPException(503, "PayPal n'est pas configuré (identifiants absents des Réglages)")

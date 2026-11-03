@@ -111,3 +111,12 @@ async def test_capturing_an_order_already_captured_is_not_an_error(api_as, make_
     paypal.capture_order = already
     r = await (await api_as(await make_user("a@x.fr"))).post("/api/billing/paypal/capture", json={"order_id": "ORDER-1"})
     assert r.status_code == 200 and r.json() == {"credited": 0}
+
+
+async def test_get_paypal_prefers_the_saved_credentials_then_a_shared_fake(session, monkeypatch):
+    monkeypatch.setattr(settings, "fake_providers", True)
+    assert await get_paypal(session) is await get_paypal(session)  # sans identifiants : même faux d'une requête à l'autre
+    app_settings = AppSettings(session)
+    await app_settings.set("paypal_client_id", "id")
+    await app_settings.set("paypal_client_secret", "secret")
+    assert isinstance(await get_paypal(session), PayPalClient)
