@@ -95,7 +95,10 @@ class AppSettings:
     @staticmethod
     def _fallback(key: str) -> str:
         """Valeur hors base : environnement, ou défaut du code si elle est vide (ex. `COMFYUI_URL=`)."""
-        return str(getattr(settings, key, "") or DEFAULTS.get(key, ""))
+        value = str(getattr(settings, key, "") or DEFAULTS.get(key, ""))
+        if key == "default_voice_id" and not value and settings.fake_providers:
+            return "fake-voice"  # sans clé ElevenLabs, le mode factice doit quand même aller jusqu'au bout
+        return value
 
     async def set_many(self, values: dict[str, str]) -> None:
         """Écrit toutes les clés en une seule transaction (tout ou rien)."""

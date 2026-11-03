@@ -120,3 +120,10 @@ async def test_get_paypal_prefers_the_saved_credentials_then_a_shared_fake(sessi
     await app_settings.set("paypal_client_id", "id")
     await app_settings.set("paypal_client_secret", "secret")
     assert isinstance(await get_paypal(session), PayPalClient)
+
+
+async def test_fake_mode_has_a_default_voice_so_a_fresh_install_runs_end_to_end(session, monkeypatch):
+    monkeypatch.setattr(settings, "fake_providers", True)
+    assert await AppSettings(session).get("default_voice_id") == "fake-voice"
+    monkeypatch.setattr(settings, "fake_providers", False)
+    assert await AppSettings(session).get("default_voice_id") == ""
