@@ -1,0 +1,51 @@
+/* Tarifs : tableau des marges, puis les groupes de réglages. */
+.pricing-block {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 32px;
+}
+
+.pricing-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pricing-head select {
+  width: auto;
+}
+
+.pricing-group {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+}
+
+.pricing-group legend {
+  padding: 0 6px;
+  font-weight: 600;
+}
+
+.pricing-group p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.pricing-total td {
+  font-weight: 600;
+}
+
+/* Marge observée sous la marge visée. */
+.pricing-low {
+  color: var(--st-awaiting);
+}

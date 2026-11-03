@@ -1,0 +1,26 @@
+/* Bibliothèque musicale : tableau nom / tags / durée / lecteur. */
+.track-title {
+  font-weight: 500;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tags li {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.music-table {
+  min-width: 640px; /* téléphone : défilement horizontal */
+}
+

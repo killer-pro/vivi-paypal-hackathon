@@ -1,0 +1,207 @@
+/* Barre latérale fine (72 px) : icône + libellé court, comme le rail d'outils de l'éditeur. */
+.shell {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  height: 100vh;
+  padding: 20px 8px 14px;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+
+/* Logo au-dessus du nom, comme sur la planche de marque. */
+.sidebar-brand {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sidebar .brand-mark {
+  width: 48px;
+  height: 48px;
+}
+
+.nav {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+}
+
+.nav-link {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 9px 0 7px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background var(--t-fast),
+    color var(--t-fast);
+}
+
+.nav-link:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.nav-link.active {
+  position: relative;
+  background: var(--raised);
+  color: var(--text);
+}
+
+/* Repère de page courante : barre d'accent sur le bord intérieur de la barre latérale. */
+.nav-link.active::before {
+  content: "";
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  left: -8px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
+}
+
+.nav-link.active svg {
+  color: var(--accent);
+}
+
+/* Solde sous l'icône « Crédits » : chiffres tabulaires, accent réservé à l'élément actif. */
+.credit-chip {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.logout {
+  position: relative;
+  width: 100%;
+  margin-top: auto;
+}
+
+/* Échec de déconnexion : bulle à droite de la barre (trop étroite pour un message). */
+.logout .error {
+  position: absolute;
+  bottom: 0;
+  left: calc(100% + 12px);
+  z-index: 1;
+  width: 240px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--raised);
+}
+
+.main {
+  min-width: 0;
+  padding: 32px 48px 64px;
+}
+
+/* Une seule largeur de page pour tous les écrans (jeton --page-w), centrée. */
+.main > * {
+  max-width: var(--page-w);
+  margin-inline: auto;
+}
+
+/* Mobile : la navigation passe en barre d'onglets fixée en bas (zone du pouce). */
+@media (max-width: 720px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: fixed;
+    inset: auto 0 0;
+    z-index: 20;
+    flex-direction: row;
+    justify-content: space-around;
+    gap: 0;
+    height: auto;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    border-right: 0;
+    background: color-mix(in srgb, var(--panel) 92%, transparent);
+    backdrop-filter: blur(12px); /* avoid-ai-design-ignore: K3 : la barre recouvre un contenu qui défile */
+  }
+
+  .sidebar .brand-mark {
+    display: none;
+  }
+
+  .nav {
+    display: flex;
+    flex: 1;
+    gap: 2px;
+  }
+
+  .nav-link {
+    flex: 1;
+    min-height: 48px;
+    padding: 6px 0;
+  }
+
+  .nav-link.active::before {
+    inset: 0 30% auto;
+    width: auto;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+  }
+
+  .logout {
+    width: auto;
+    margin: 0;
+  }
+
+  .logout .nav-link {
+    min-width: 56px;
+  }
+
+  .logout .error {
+    top: auto;
+    right: 0;
+    bottom: calc(100% + 8px);
+    left: auto;
+  }
+
+  .main {
+    padding: 20px 16px calc(88px + env(safe-area-inset-bottom));
+  }
+}
+
+/* Adresse non confirmée : une ligne teintée en tête de page, action à droite. */
+.verify-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-bottom: 20px;
+  padding: 8px 8px 8px 14px;
+  border-radius: var(--radius-m);
+  background: color-mix(in srgb, var(--st-awaiting) 10%, transparent);
+  font-size: 13px;
+}
+
+.verify-banner .btn {
+  margin-left: auto;
+}

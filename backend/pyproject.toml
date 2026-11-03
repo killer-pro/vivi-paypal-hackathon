@@ -1,0 +1,34 @@
+[project]
+name = "video-virale"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi", "uvicorn[standard]", "sqlalchemy[asyncio]", "asyncpg", "alembic",
+  "pydantic-settings", "arq", "redis", "boto3", "httpx", "anthropic",
+  "itsdangerous", "python-multipart", "cryptography", "langfuse>=5,<6",
+]
+[project.optional-dependencies]
+dev = ["pytest", "pytest-asyncio", "ruff", "mypy"]
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+[tool.setuptools.packages.find]
+include = ["app*"]
+[tool.mypy]
+python_version = "3.12"
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = ["boto3", "botocore.*"]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = [
+  "B008",   # Depends(...) dans les signatures : idiome FastAPI
+  "E501",   # longueur des lignes : non imposée (commentaires explicatifs longs)
+  "UP047",  # TypeVar classique plutôt que la syntaxe PEP 695, par cohérence avec le reste du code
+]

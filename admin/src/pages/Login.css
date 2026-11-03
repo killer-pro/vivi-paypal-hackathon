@@ -1,0 +1,98 @@
+/* Écrans de compte (connexion, inscription, vérification, mot de passe) : carte centrée commune (`AuthCard`). */
+/* Mur de clips derrière la carte, sous un voile qui garde le formulaire lisible. */
+.auth-screen {
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-screen::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at center, rgb(8 10 12 / 0.55) 0%, rgb(8 10 12 / 0.9) 100%);
+  pointer-events: none;
+}
+
+.login-card {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 18px;
+  width: min(380px, 100%);
+  padding: 30px 28px 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: rgb(20 23 26 / 0.88);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 24px 64px rgb(0 0 0 / 0.5);
+}
+
+.login-head {
+  width: fit-content;
+  text-decoration: none;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  margin-inline: auto;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.login-head .brand-mark {
+  width: 64px;
+  height: 64px;
+}
+
+.login-brand {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.login-intro {
+  margin-top: -8px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.login-intro q {
+  color: var(--text);
+}
+
+.login-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.login-submit {
+  height: 40px;
+  justify-content: center;
+}
+
+.login-message {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Liens vers les autres écrans de compte, séparés de l'action par un filet. */
+.login-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.login-links a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.login-links a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}

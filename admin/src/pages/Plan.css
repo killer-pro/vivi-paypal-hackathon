@@ -1,0 +1,458 @@
+/* Écran Plan : le chat à gauche (≈26 %), le plan au centre, le panneau Apparence à droite (≈24 %) ; sur mobile, le plan,
+   l'Apparence puis le chat. */
+.plan {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.plan-head {
+  display: flex;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 56px;
+  padding: 10px 16px 10px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.plan-error {
+  margin: 12px 18px 0;
+}
+
+/* Génération du plan, échec ou rien de généré : les étapes (idée, histoire, scènes) et leur état, en une colonne
+   centrée ; l'état est dit par un libellé, la teinte (`--st`) n'en est qu'un renfort. */
+.plan-progress {
+  display: grid;
+  gap: 16px;
+  width: min(100% - 32px, 560px);
+  margin: 48px auto;
+}
+
+.plan-progress h2 {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.plan-progress > .muted {
+  margin: -8px 0 0;
+}
+
+.plan-steps {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--panel);
+  list-style: none;
+}
+
+.plan-step {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  padding: 14px 16px;
+}
+
+.plan-step + .plan-step {
+  border-top: 1px solid var(--line);
+}
+
+/* Le numéro de l'étape dans un cercle teinté par son état ; l'anneau qui tourne le remplace pendant la génération. */
+.plan-step-mark {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--st);
+  border-radius: 50%;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* L'étape en cours est l'élément actif : filet d'accent sur son bord gauche. */
+.st-running.plan-step {
+  box-shadow: inset 2px 0 var(--accent);
+}
+
+.st-running .plan-step-mark {
+  border-color: transparent;
+}
+
+.st-approved .plan-step-mark {
+  background: color-mix(in srgb, var(--st) 15%, transparent);
+  color: var(--st);
+}
+
+.plan-step-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 4px;
+}
+
+.plan-step-text .muted {
+  font-size: 13px;
+}
+
+.plan-step-text .error {
+  margin-top: 6px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.plan-step .status-badge {
+  margin-top: 4px;
+}
+
+.st-pending.plan-step .plan-step-text strong {
+  color: var(--muted);
+}
+
+.plan-progress-action {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.plan-body {
+  flex: 1;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: minmax(260px, 26fr) minmax(0, 50fr) minmax(240px, 24fr);
+  grid-template-areas: "chat plan look";
+  min-height: 0;
+}
+
+.plan-view {
+  grid-area: plan;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 28px;
+  min-height: 0;
+  padding: 18px 20px 0;
+  overflow-y: auto;
+}
+
+/* `minmax(0, 1fr)` : le casting défile dans sa colonne au lieu de l'élargir. */
+.plan-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+.plan-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+
+/* Enregistrer / Annuler restent à portée pendant l'édition, y compris de la fiche visuelle (panneau Apparence). */
+.plan-view > .form-actions {
+  position: sticky;
+  bottom: 0;
+  margin: 0 -20px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.plan-view > :last-child:not(.form-actions) {
+  margin-bottom: 28px;
+}
+
+.plan-view .scene-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Panneau Apparence */
+.appearance {
+  grid-area: look;
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  min-height: 0;
+  padding: 18px 16px;
+  overflow-y: auto;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.appearance-facts {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.appearance-facts div {
+  display: grid;
+  gap: 2px;
+}
+
+.appearance-facts dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.appearance-facts dd {
+  margin: 0;
+}
+
+/* Le total de dépense s'aligne sur le texte du panneau (son bouton garde sa marge de survol). */
+.appearance .studio-cost {
+  justify-self: start;
+  margin-left: -8px;
+}
+
+.plan-foot p {
+  margin: 0;
+  font-size: 13px;
+}
+
+.scene-summary {
+  margin: 4px 0 0;
+}
+
+.plan-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 12px 18px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+/* Chat */
+.chat {
+  grid-area: chat;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  min-height: 0;
+  padding: 18px 16px;
+  border-right: 1px solid var(--line);
+}
+
+.chat h2 {
+  margin: 0;
+}
+
+.chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.chat-message {
+  max-width: 92%;
+  padding: 8px 12px;
+  border-radius: var(--radius-m);
+  background: var(--raised);
+}
+
+.chat-message p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.chat-user {
+  align-self: flex-end;
+  border: 1px solid var(--line);
+  background: transparent;
+}
+
+.chat-changed {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.chat-form {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+}
+
+.chat-form .textarea {
+  justify-self: stretch;
+}
+
+.chat-form .input {
+  width: 100%;
+  resize: vertical;
+}
+
+.chat-blocked {
+  margin: 0;
+  justify-self: start;
+  font-size: 13px;
+}
+
+@media (max-width: 860px) {
+  .plan {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .plan-body {
+    grid-template-rows: none;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "plan" "look" "chat";
+  }
+
+  .plan-view,
+  .appearance {
+    overflow: visible;
+  }
+
+  .plan-view > .form-actions {
+    position: static;
+  }
+
+  .appearance {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .scene-card.has-cast {
+    --thumb-w: 44px;
+  }
+
+  .chat {
+    border-top: 1px solid var(--line);
+    border-right: 0;
+  }
+
+  .chat-log {
+    max-height: 50vh;
+  }
+
+  .plan-foot {
+    position: sticky;
+    bottom: 0;
+    flex-wrap: wrap;
+  }
+
+  .plan-foot .btn {
+    flex: 1;
+  }
+
+  /* La barre reste compacte : sur mobile, l'action se suffit. */
+  .plan-foot p {
+    display: none;
+  }
+}
+
+/* Histoire (beats et éléments suivis) : une seule colonne, le chat agit sur les scènes */
+.plan-body-story {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "plan";
+}
+
+/* La consigne d'une section se colle à son titre. */
+.story-lead {
+  margin: -6px 0 0;
+  font-size: 13px;
+}
+
+/* État vide d'une section : le cadre en pointillés de `.empty`, à la largeur de la colonne. */
+.story-empty {
+  max-width: none;
+  margin: 0;
+  padding: 20px;
+  color: var(--muted);
+}
+
+.story-row {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.story-add {
+  display: flex;
+  gap: 8px;
+}
+
+.story-add .input {
+  flex: 1;
+}
+
+.story-presence {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.story-presence legend {
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.story-presence-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 36px;
+}
+
+.story-presence-row label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-body-story .scene-card-head h4 {
+  margin: 0;
+}
+
+.story-warnings {
+  margin: 0;
+  padding: 10px 12px 10px 28px;
+  border-radius: var(--radius-s);
+  background: var(--raised);
+  font-size: 13px;
+}
+
+/* La colonne de l'histoire est centrée mais c'est toute la zone qui défile : la barre de défilement reste au bord. */
+.plan-body-story {
+  overflow-y: auto;
+}
+
+.plan-body-story .plan-view {
+  width: 100%;
+  max-width: var(--page-w-narrow);
+  margin-inline: auto;
+  overflow: visible;
+}
+
+/* Après la règle de base : sur mobile, nom et type à parts égales (le type reste lisible). */
+@media (max-width: 860px) {
+  .story-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

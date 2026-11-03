@@ -1,0 +1,22 @@
+{
+  "name": "video-virale",
+  "private": true,
+  "description": "Vidéo virale IA : lance l'infra (Docker), l'API, le worker, l'admin et ComfyUI depuis la racine.",
+  "scripts": {
+    "dev": "npm run infra && npm run migrate && concurrently --kill-others-on-fail -n api,worker,admin,comfy -c blue,magenta,green,yellow \"npm:api\" \"npm:worker\" \"npm:admin\" \"npm:comfy\"",
+    "api": "cd backend && .venv/bin/uvicorn app.main:app --port 8000",
+    "worker": "cd backend && .venv/bin/arq app.worker.WorkerSettings",
+    "admin": "npm run dev --prefix admin",
+    "comfy": "curl -sf http://127.0.0.1:8188/system_stats >/dev/null && echo \"ComfyUI déjà lancé sur :8188\" || (cd ${COMFYUI_DIR:-../stabledifusion/ComfyUI} && venv/bin/python main.py --listen 127.0.0.1 --port 8188)",
+    "infra": "docker compose up -d",
+    "migrate": "cd backend && .venv/bin/alembic upgrade head",
+    "setup": "test -f backend/.env || cp .env.example backend/.env; cd backend && python3.12 -m venv .venv && .venv/bin/pip install -e '.[dev]' && cd ../admin && npm install",
+    "seed:music": "cd backend && .venv/bin/python scripts/seed_music.py",
+    "stop": "docker compose stop",
+    "test": "cd backend && .venv/bin/pytest && cd ../admin && npx vitest run",
+    "lint": "cd backend && uvx ruff check app tests && uv run mypy app && cd ../admin && npx tsc -b && npm run lint"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

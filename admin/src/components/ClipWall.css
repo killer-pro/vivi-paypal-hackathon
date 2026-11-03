@@ -1,0 +1,57 @@
+/* Mur de clips verticaux : colonnes inclinées de 8° qui dérivent, posées derrière le contenu de l'écran. */
+.clip-wall {
+  position: absolute;
+  inset: -20% -10%;
+  display: flex;
+  gap: 16px;
+  transform: rotate(-8deg);
+}
+
+.clip-wall-col {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.clip-wall-col:nth-child(even) {
+  margin-top: -18%;
+}
+
+.clip-wall-clip {
+  position: relative;
+  flex: none;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  border-radius: var(--radius-l);
+  background: var(--raised);
+}
+
+.clip-wall-clip video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Chaque colonne dérive d'une demi-hauteur (le contenu est doublé), une sur deux en sens inverse. */
+  .clip-wall-col {
+    animation: clip-wall-drift 60s linear infinite;
+    animation-duration: calc(48s + var(--i) * 9s);
+  }
+
+  .clip-wall-col:nth-child(even) {
+    animation-direction: reverse;
+  }
+
+  @keyframes clip-wall-drift {
+    to { transform: translateY(calc(-50% - 8px)); }
+  }
+}
+
+@media (max-width: 640px) {
+  .clip-wall-col:nth-child(n + 4) {
+    display: none;
+  }
+}

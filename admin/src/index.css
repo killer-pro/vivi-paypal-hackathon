@@ -1,0 +1,693 @@
+/* Jetons partagés par tous les écrans de l'admin (direction « Studio » : voir docs/admin.md). */
+:root {
+  /* Surfaces : quatre niveaux de profondeur, du plus enfoncé au plus flottant. */
+  --bg: #0d0f11;
+  --panel: #14171a;
+  --raised: #1b1f23;
+  --float: #22272c;
+
+  --line: #252a2f;
+  --line-strong: #353c43;
+  --text: #eceff1;
+  --muted: #98a2ab;
+  --faint: #6b747c;
+
+  --accent: #2cc2d8; /* action principale */
+  --accent-hover: #5ad3e5;
+  --accent-ink: #04191d; /* texte sur l'accent : contraste AA */
+  --accent-soft: color-mix(in srgb, var(--accent) 14%, transparent);
+
+  /* Pistes de la timeline : la couleur dit le type de média. */
+  --track-clip: #8c9cff;
+  --track-voice: #f0a35e;
+  --track-music: #c792ea;
+  --track-subs: #e4e7ee;
+
+  /* Statuts d'étape */
+  --st-pending: #6b747c;
+  --st-running: #2cc2d8;
+  --st-awaiting: #f0c14b;
+  --st-approved: #4cc38a;
+  --st-failed: #ef6a64;
+  --st-stale: #a99af5;
+
+  /* Largeurs de page : une seule échelle pour tous les écrans (voir docs/design-system.md). */
+  --page-w: 1240px;
+  --page-w-narrow: 880px;
+
+  --radius-s: 6px; /* contrôles */
+  --radius-m: 10px; /* cartes et surfaces */
+  --radius-l: 14px; /* modales, panneaux flottants */
+
+  --shadow-float: 0 12px 32px rgb(0 0 0 / 0.45), 0 0 0 1px var(--line-strong);
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+  --t-fast: 120ms var(--ease);
+
+  --font: "Geist Variable", system-ui, sans-serif;
+
+  color-scheme: dark;
+  font: 400 14px/1.5 var(--font);
+  font-feature-settings: "tnum", "cv11";
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--bg);
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* Texte réservé aux lecteurs d'écran */
+/* Détail de libellé abandonné sur petit écran (le bouton garde son sens sans lui). */
+@media (max-width: 900px) {
+  .hide-narrow {
+    display: none;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Logo Vivi : un V en dégradé (voir docs/marque.md). */
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  background: url("/favicon.svg") center / contain no-repeat;
+}
+
+/* Écran plein centré (connexion, erreur de session) */
+.center-screen {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 16px;
+}
+
+/* Boutons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--raised);
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  text-decoration: none; /* lien présenté en bouton (ex. « Exporter ») */
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background var(--t-fast),
+    border-color var(--t-fast),
+    transform var(--t-fast);
+}
+
+.btn svg {
+  flex: none;
+  margin-inline: -2px;
+}
+
+.btn:hover {
+  border-color: var(--faint);
+  background: var(--float);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.btn-small {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.btn-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+.btn-ghost {
+  border-color: transparent;
+  background: none;
+  color: var(--muted);
+}
+
+.btn-ghost:hover {
+  border-color: transparent;
+  background: var(--raised);
+  color: var(--text);
+}
+
+.btn-danger:hover {
+  border-color: var(--st-failed);
+  color: var(--st-failed);
+}
+
+/* Bouton carré portant une seule icône ; le libellé passe par aria-label et title. */
+.btn-icon {
+  width: 34px;
+  padding: 0;
+}
+
+.btn-icon.btn-small {
+  width: 28px;
+}
+
+.btn-icon svg {
+  margin: 0;
+}
+
+/* Champs de formulaire */
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field > span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-s);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  transition:
+    border-color var(--t-fast),
+    box-shadow var(--t-fast);
+}
+
+.input::placeholder {
+  color: var(--faint);
+}
+
+.input:hover {
+  border-color: var(--faint);
+}
+
+textarea.input {
+  height: auto;
+  min-height: 76px;
+  padding: 9px 12px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  outline: none;
+}
+
+/* Liste déroulante : flèche dessinée, même hauteur et même focus que les autres champs. */
+select.input {
+  padding-right: 32px;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2398a2ab' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 10px center;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+/* Champ de recherche : loupe à gauche, croix pour effacer (natif masqué). */
+.input-search {
+  position: relative;
+  display: block;
+}
+
+.input-search > svg {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  translate: 0 -50%;
+  color: var(--faint);
+  pointer-events: none;
+}
+
+.input-search .input {
+  padding-left: 34px;
+}
+
+.input-search input::-webkit-search-cancel-button {
+  appearance: none;
+}
+
+.form {
+  display: grid;
+  gap: 14px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.form-actions-hint {
+  align-self: center;
+  margin-right: auto;
+  font-size: 13px;
+}
+
+.error {
+  color: var(--st-failed);
+  font-size: 13px;
+}
+
+/* Erreur d'action affichée sous l'en-tête de page */
+.page-error {
+  margin-bottom: 14px;
+}
+
+.error-state {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+
+/* Modale (<dialog> natif) */
+.modal {
+  width: min(480px, calc(100vw - 32px));
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-l);
+  background: var(--panel);
+  box-shadow: var(--shadow-float);
+  color: var(--text);
+}
+
+.modal[open] {
+  animation: pop 160ms var(--ease);
+}
+
+.modal::backdrop {
+  background: rgb(5 7 9 / 0.66);
+}
+
+.modal-head {
+  padding: 20px 24px 0;
+}
+
+.modal-body {
+  padding: 14px 24px 24px;
+}
+
+@keyframes pop {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+/* Tableaux de données */
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+
+.table tbody tr:hover {
+  background: var(--panel);
+}
+
+.num {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.table th.num {
+  text-align: right;
+}
+
+/* En-tête de page, état vide, tableau défilant */
+.page-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.page-head-actions {
+  margin-left: auto;
+}
+
+.empty {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  max-width: 560px;
+  padding: 28px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-m);
+}
+
+.empty .btn {
+  margin-top: 6px;
+}
+
+.table-wrap {
+  position: relative; /* contient les éléments .sr-only : pas de débordement de page */
+  overflow-x: auto;
+}
+
+/* Médias verticaux 9:16 : le format des vidéos produites. */
+.frame-9x16 {
+  display: block;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  border-radius: var(--radius-s);
+  background: #000;
+}
+
+/* Statuts : chaque classe `.st-*` fixe `--st`, réutilisé par le rail, les panneaux, les badges et les pastilles. */
+.st-pending {
+  --st: var(--st-pending);
+}
+.st-running {
+  --st: var(--st-running);
+}
+.st-awaiting_validation {
+  --st: var(--st-awaiting);
+}
+.st-approved {
+  --st: var(--st-approved);
+}
+.st-failed {
+  --st: var(--st-failed);
+}
+.st-stale {
+  --st: var(--st-stale);
+}
+
+/* Pulsation discrète d'un élément en cours de génération (sans animation si `prefers-reduced-motion`). */
+@keyframes live {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--st) 15%, transparent);
+  color: var(--st);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.st-pending .status-badge {
+  color: var(--muted);
+}
+
+/* Champ avec assistant IA (AssistField) : le champ, puis une ligne « consigne + un seul bouton ». */
+/* Champ assisté : le libellé et l'action de l'IA partagent une ligne, la consigne n'apparaît qu'à la demande. */
+.assist-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.assist-head label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.assist-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: -6px;
+}
+
+.assist-actions [aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.assist-btn {
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.assist-btn:hover {
+  color: var(--text);
+  border-color: var(--line);
+  background: var(--raised);
+}
+
+textarea.assist-instruction {
+  min-height: 52px;
+  font-size: 13px;
+}
+
+/* Proposition en cours : le champ est entouré de la couleur de l'assistant. */
+.is-assisting .input:not(.assist-instruction) {
+  border-color: var(--accent);
+  border-style: dashed;
+}
+
+.assist-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 13px;
+}
+
+/* Écran tactile : cibles d'au moins 32 px (les boutons compacts de bureau en font 24 à 26). */
+@media (pointer: coarse) {
+  .btn,
+  .input {
+    min-height: 40px;
+  }
+
+  .btn-small,
+  .assist-btn {
+    min-height: 32px;
+  }
+
+  .btn-icon.btn-small {
+    min-width: 32px;
+  }
+
+  .pill span {
+    height: 36px;
+  }
+}
+
+/* Mouvement réduit : les transitions et animations d'interface (fenêtres, survols) deviennent instantanées. */
+@media (prefers-reduced-motion: reduce) {
+  .spinner,
+  .studio[data-busy] .btn:disabled::before {
+    animation: none; /* un anneau figé reste lisible ; une boucle accélérée à 0,01 ms clignoterait */
+  }
+
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* Zone de saisie auto-extensible (TextArea) et son compteur de caractères. */
+.textarea {
+  display: grid;
+  gap: 4px;
+}
+
+.textarea textarea.input {
+  overflow-y: hidden;
+  resize: none;
+}
+
+.char-count {
+  justify-self: end;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+.char-count.is-full {
+  color: var(--st-failed);
+  font-weight: 500;
+}
+
+/* Indicateur de génération en cours : anneau qui tourne (l'état s'ajoute au libellé, jamais seul). */
+.spinner {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* Pendant une génération, un bouton grisé de l'éditeur le dit : anneau devant le libellé et, au survol, la raison
+   (`--busy-reason`, posée sur `.studio`). */
+.studio[data-busy] :is(.step-panel, .scene-actions, .scene-move) .btn:disabled {
+  position: relative;
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--faint);
+  opacity: 1; /* l'opacité s'appliquerait aussi à l'infobulle : le grisé passe par la couleur */
+}
+
+.studio[data-busy] :is(.step-panel, .scene-actions, .scene-move) .btn-ghost:disabled {
+  border-color: transparent;
+  background: none;
+}
+
+.studio[data-busy] :is(.step-panel, .scene-actions) .btn:disabled::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--muted);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.studio[data-busy] :is(.step-panel, .scene-actions, .scene-move) .btn:disabled:hover::after {
+  content: var(--busy-reason);
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 10;
+  width: max-content;
+  max-width: 240px;
+  padding: 6px 10px;
+  border-radius: var(--radius-s);
+  background: var(--float);
+  box-shadow: var(--shadow-float);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 400;
+  white-space: normal;
+  pointer-events: none;
+}

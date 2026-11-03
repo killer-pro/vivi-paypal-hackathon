@@ -1,0 +1,110 @@
+/* Réglages : une carte par service ; l'état de la connexion est dit par le badge. */
+.main > .providers-page {
+  max-width: var(--page-w-narrow);
+}
+
+.providers {
+  display: grid;
+  gap: 18px;
+}
+
+.provider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.provider-card {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 18px 20px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: var(--panel);
+}
+
+.provider-defaults {
+  grid-column: 1 / -1;
+}
+
+.provider-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.provider-head p {
+  margin-top: 2px;
+  font-size: 13px;
+}
+
+.provider-card .field small {
+  font-size: 12px;
+}
+
+.health-badge {
+  flex-shrink: 0;
+}
+
+.health-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.providers-foot {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+}
+
+/* Pleine largeur de la carte : profils vidéo sur plusieurs colonnes (empilés sur mobile). */
+.provider-defaults .model-group {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+@media (max-width: 720px) {
+  .provider-defaults .form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.voice-catalog {
+  display: grid;
+  gap: 10px;
+}
+.voice-catalog h3 {
+  font-size: 0.95rem;
+}
+.voice-list {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.voice-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.voice-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+.voice-add .field {
+  flex: 1 1 160px;
+}

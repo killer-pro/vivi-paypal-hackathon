@@ -1,0 +1,165 @@
+/* Coûts : filtres, synthèse (total + deux répartitions en barres), journal des appels. */
+.cost-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.cost-filters .field {
+  width: min(100%, 240px);
+}
+
+.cost-summary {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) 1fr 1fr;
+  gap: 1px;
+  margin-bottom: 28px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--line); /* filets de 1px entre les blocs */
+}
+
+.cost-summary > * {
+  padding: 18px 20px;
+  background: var(--panel);
+}
+
+.cost-total {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.cost-total strong {
+  font-size: 34px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.breakdown {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.breakdown h2 {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.breakdown ul {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.breakdown-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.breakdown-row:hover {
+  background: var(--raised);
+}
+
+.breakdown-row[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+
+.breakdown-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.breakdown-value {
+  white-space: nowrap;
+}
+
+.breakdown-value .muted {
+  margin-left: 4px;
+  font-size: 12px;
+}
+
+.breakdown-track {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--raised);
+}
+
+.breakdown-bar {
+  display: block;
+  height: 100%;
+  min-width: 2px; /* poste non nul mais minuscule : reste visible */
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+.calls-title {
+  margin-bottom: 8px;
+}
+
+.calls-table {
+  min-width: 860px; /* téléphone : le tableau défile horizontalement plutôt que d'écraser ses colonnes */
+}
+
+.calls-table .nowrap {
+  white-space: nowrap;
+}
+
+.calls-table a {
+  text-decoration: none;
+}
+
+.calls-table a:hover {
+  color: var(--accent);
+}
+
+.call-model {
+  font-size: 12px;
+}
+
+.call-error {
+  max-width: 320px;
+  margin-top: 4px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 900px) {
+  .cost-summary {
+    grid-template-columns: 1fr;
+  }
+}
+
+.calls-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+@media (max-width: 720px) {
+  .cost-filters .field,
+  .cost-filters .input {
+    width: 100%;
+  }
+}

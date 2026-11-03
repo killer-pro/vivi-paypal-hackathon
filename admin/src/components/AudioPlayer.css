@@ -1,0 +1,103 @@
+.audio-player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  width: 100%;
+  max-width: 320px;
+}
+
+.audio-play {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--raised);
+  color: var(--text);
+  cursor: pointer;
+  transition: background var(--t-fast);
+}
+
+.audio-play:hover {
+  background: var(--float);
+}
+
+.audio-play svg {
+  width: 14px;
+  height: 14px;
+}
+
+.audio-time {
+  flex: none;
+  min-width: 32px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: right;
+}
+
+/* Barre de progression : piste fine, partie lue à l'accent ; le curseur n'apparaît qu'au survol ou au focus. */
+.audio-seek {
+  flex: 1;
+  min-width: 0;
+  height: 16px;
+  margin: 0;
+  appearance: none;
+  background: none;
+  cursor: pointer;
+}
+
+.audio-seek:disabled {
+  cursor: default;
+}
+
+.audio-seek::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent) var(--progress), var(--line-strong) var(--progress));
+}
+
+.audio-seek::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+
+.audio-seek::-moz-range-progress {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+.audio-seek::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  margin-top: -4px;
+  border: 0;
+  border-radius: 50%;
+  appearance: none;
+  background: var(--text);
+  opacity: 0;
+  transition: opacity var(--t-fast);
+}
+
+.audio-seek::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text);
+  opacity: 0;
+}
+
+.audio-player:hover .audio-seek::-webkit-slider-thumb,
+.audio-seek:focus-visible::-webkit-slider-thumb {
+  opacity: 1;
+}
+
+.audio-player:hover .audio-seek::-moz-range-thumb,
+.audio-seek:focus-visible::-moz-range-thumb {
+  opacity: 1;
+}

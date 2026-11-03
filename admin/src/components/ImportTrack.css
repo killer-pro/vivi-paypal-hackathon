@@ -1,0 +1,16 @@
+/* Fenêtre d'import d'une piste : sélecteur de fichier. */
+.file-input {
+  height: auto;
+  padding: 6px;
+}
+
+.file-input::file-selector-button {
+  margin-right: 10px;
+  padding: 4px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--raised);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}

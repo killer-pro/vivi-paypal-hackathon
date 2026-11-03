@@ -1,0 +1,45 @@
+/* Abonnement et recharges : l'abonnement en tête (accent sur son seul bouton), puis les packs de crédits. */
+.billing {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.billing-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+}
+
+.billing-head .btn {
+  margin-left: auto;
+}
+
+.billing-offers {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.4fr) repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.offer {
+  display: grid;
+  align-content: space-between;
+  justify-items: start;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--panel);
+  font-size: 13px;
+}
+
+.offer .btn {
+  margin-top: 8px;
+}
+
+@media (max-width: 720px) {
+  .billing-offers {
+    grid-template-columns: 1fr;
+  }
+}

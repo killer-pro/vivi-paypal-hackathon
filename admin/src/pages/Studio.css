@@ -1,0 +1,1849 @@
+/* Éditeur « Studio » plein cadre : en-tête, frise des étapes, scènes, aperçu 9:16, panneau, timeline (voir docs/admin.md).
+   Les couleurs de piste (--track-*) disent le type de média ; --st (classes .st-*) dit le statut d'une étape. */
+.studio {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--panel-w, 380px);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "head head"
+    "pipeline pipeline"
+    "preview panel"
+    "timeline timeline";
+  height: 100vh;
+  height: 100dvh;
+}
+
+.studio.has-scenes {
+  grid-template-columns: var(--rail-w, 252px) minmax(0, 1fr) var(--panel-w, 380px);
+  grid-template-areas:
+    "head head head"
+    "pipeline pipeline pipeline"
+    "scenes preview panel"
+    "timeline timeline timeline";
+}
+
+/* En-tête */
+.studio-head {
+  grid-area: head;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 56px;
+  padding: 10px 16px 10px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.back {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-s);
+  color: var(--muted);
+  transition:
+    background var(--t-fast),
+    color var(--t-fast);
+}
+
+.back:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.title-field {
+  flex: 0 1 440px;
+  min-width: 0;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+}
+
+.title-field:hover {
+  border-color: var(--line);
+}
+
+.title-field:focus {
+  border-color: var(--accent);
+  background: var(--bg);
+  outline: none;
+}
+
+.studio-cost {
+  position: relative;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.cost-trigger {
+  display: block;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  cursor: default;
+}
+
+.studio-cost:hover .cost-trigger,
+.cost-trigger:focus-visible {
+  background: var(--raised);
+}
+
+.studio-cost.is-near .cost-trigger {
+  color: var(--st-awaiting);
+}
+
+.studio-cost.is-over .cost-trigger {
+  color: var(--st-failed);
+}
+
+/* Détail au survol ou au focus ; `top: 100%` sans interstice : le pointeur peut passer du total à la bulle. */
+.cost-pop {
+  display: none;
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  width: 280px;
+  padding: 14px 16px;
+  border-radius: var(--radius-m);
+  background: var(--float);
+  box-shadow: var(--shadow-float);
+  font-weight: 400;
+}
+
+.studio-cost:hover .cost-pop,
+.studio-cost:focus-within .cost-pop {
+  display: block;
+}
+
+.cost-pop ul {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.cost-pop li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cost-pop p {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.studio-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 12px;
+  margin-left: auto;
+}
+
+.autopilot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 4px 0 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  font-size: 13px;
+}
+
+.autopilot strong {
+  font-weight: 600;
+}
+
+.autopilot-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--st-running);
+  animation: live 1.6s ease-in-out infinite;
+}
+
+.studio-error {
+  flex-basis: 100%;
+}
+
+/* Générations en cours : au centre de l'en-tête, absentes quand rien ne tourne. */
+.activity-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 4px 8px;
+  margin-inline: auto;
+  font-size: 13px;
+}
+
+.activity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 4px 3px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+}
+
+/* File d'attente : dépliée sous le bandeau, dans l'ordre de départ. */
+.queue {
+  position: relative;
+}
+
+.queue-toggle svg {
+  transition: transform var(--t-fast);
+}
+
+.queue-toggle[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.queue-pop {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 4px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 260px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border-radius: var(--radius-m);
+  background: var(--float);
+  box-shadow: var(--shadow-float);
+}
+
+.queue-pop li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 2px 2px 10px;
+  border-radius: var(--radius-s);
+}
+
+.queue-pop li:hover {
+  background: var(--raised);
+}
+
+.queue-item {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Scène en cours de génération dans le storyboard. */
+.scene-busy {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--st-running);
+  animation: live 1.6s ease-in-out infinite;
+}
+
+/* Frise des étapes : l'ordre de production, la pastille dit où en est chaque étape (--st). */
+.pipeline {
+  grid-area: pipeline;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.pipeline ol {
+  display: flex;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 14px;
+  border: 0;
+  background: none;
+  box-shadow: inset 0 -2px 0 transparent;
+  color: var(--muted);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--t-fast);
+}
+
+.stage:hover {
+  color: var(--text);
+}
+
+.stage[aria-current="step"] {
+  box-shadow: inset 0 -2px 0 var(--accent);
+  color: var(--text);
+}
+
+/* Pastille : creuse à faire, moitié pleine à valider, pleine en cours / validée / en échec. */
+.stage-mark {
+  position: relative;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--st);
+  border-radius: 50%;
+}
+
+.stage-mark.is-awaiting {
+  background: linear-gradient(90deg, var(--st) 50%, transparent 50%);
+}
+
+.stage-mark.is-approved,
+.stage-mark.is-failed {
+  background: var(--st);
+}
+
+/* En cours : anneau qui tourne, comme dans la barre d'activité. */
+.stage-mark.is-running {
+  border-color: color-mix(in srgb, var(--st) 25%, transparent);
+  border-top-color: var(--st);
+  animation: spin 0.8s linear infinite;
+}
+
+.stage-mark.is-approved::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  left: 3.5px;
+  width: 4px;
+  height: 7px;
+  border: solid var(--bg);
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+.stage-mark.is-failed::after {
+  content: "!";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--bg);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Scènes : le storyboard de la vidéo */
+.scene-rail {
+  position: relative;
+  z-index: 2; /* le bouton de repliage déborde sur l'aperçu */
+  grid-area: scenes;
+  min-height: 0;
+  border-right: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.scene-rail-body {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.scene-rail.is-collapsed {
+  border-right: 0;
+}
+
+.scene-rail.is-collapsed .scene-rail-body {
+  display: none;
+}
+
+.scene-rail h2 {
+  padding: 16px 16px 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scene-rail ol {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: 2px;
+  margin: 0;
+  padding: 0 8px 12px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.scene-item {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-areas:
+    "thumb text"
+    "thumb flags";
+  gap: 4px 10px;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-m);
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.scene-rail li {
+  position: relative;
+}
+
+/* Éléments visibles et enchaînement sous la ligne, sur toute la largeur du rail ; une pastille ne se coupe pas. */
+.scene-rail .scene-chips {
+  padding: 0 8px 8px;
+}
+
+.scene-rail .cast-chip {
+  max-width: 100%;
+  padding: 1px 8px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Scènes enchaînées : un trait d'accent continu dans la marge gauche du rail, de la première à la dernière de la suite. */
+.scene-rail li.is-chained::before,
+.scene-rail li.chains-next::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  bottom: 14px;
+  left: -5px;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+}
+
+.scene-rail li.is-chained::before {
+  top: -2px; /* traverse l'espace entre deux lignes */
+}
+
+.scene-rail li.chains-next::before {
+  bottom: 0;
+}
+
+.scene-move {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 2px 4px 4px;
+}
+
+.scene-item {
+  transition: background var(--t-fast);
+}
+
+.scene-item:hover {
+  background: var(--raised);
+}
+
+.scene-item[aria-current="true"] {
+  border-color: var(--accent);
+  background: var(--raised);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.scene-thumb {
+  position: relative;
+  grid-area: thumb;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-s);
+  background: var(--bg);
+}
+
+.scene-thumb video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.scene-text {
+  display: -webkit-box;
+  grid-area: text;
+  align-self: start;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.scene-flags {
+  display: flex;
+  grid-area: flags;
+  align-items: center;
+  align-self: end;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.scene-duration {
+  margin-right: auto;
+}
+
+/* Repère de présence : la couleur de piste, creuse tant que le média manque. */
+.flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.flag::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid var(--lane);
+  border-radius: 50%;
+}
+
+.flag.is-on {
+  color: var(--text);
+}
+
+.flag.is-on::before {
+  background: var(--lane);
+}
+
+/* Panneau de l'étape */
+.studio-panel {
+  position: relative;
+  z-index: 2;
+  grid-area: panel;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.studio-panel-scroll {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.studio-panel.is-collapsed {
+  border-left: 0;
+}
+
+.studio-panel.is-collapsed .studio-panel-scroll {
+  display: none;
+}
+
+/* Bord d'une colonne latérale : poignée de largeur et bouton de repliage, à cheval sur le filet. */
+.panel-edge {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  z-index: 3;
+}
+
+.edge-rail {
+  right: 0;
+}
+
+.edge-panel {
+  left: 0;
+}
+
+.edge-grip {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.edge-grip::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 3px;
+  width: 2px;
+  background: transparent;
+  transition: background var(--t-fast);
+}
+
+.edge-grip:hover::after,
+.edge-grip:focus-visible::after,
+.is-resizing .edge-grip::after {
+  background: var(--accent);
+}
+
+.edge-grip:focus-visible {
+  outline: none;
+}
+
+.edge-toggle {
+  position: absolute;
+  top: 50%;
+  left: -11px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  translate: 0 -50%;
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: var(--raised);
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background var(--t-fast),
+    color var(--t-fast);
+}
+
+.edge-toggle:hover {
+  background: var(--float);
+  color: var(--text);
+}
+
+.edge-toggle svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Colonne repliée (largeur nulle) : le bouton reste accessible, côté aperçu. */
+.edge-rail.is-collapsed .edge-toggle {
+  left: 6px;
+}
+
+.edge-panel.is-collapsed .edge-toggle {
+  left: -28px;
+}
+
+/* Pendant un glissement : curseur fixe et lecteurs insensibles au pointeur (sinon ils captent les événements). */
+.is-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.is-resizing video {
+  pointer-events: none;
+}
+
+.step-switch {
+  display: flex;
+  gap: 2px;
+  margin: 14px 16px 0;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--bg);
+}
+
+.step-switch button {
+  display: grid;
+  flex: 1;
+  gap: 1px;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.step-switch button .muted {
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.step-switch button[aria-pressed="true"] {
+  background: var(--raised);
+  color: var(--text);
+}
+
+.step-panel {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 16px 0;
+}
+
+.step-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+
+/* Message d'état d'une étape (échec, génération en aval) : fond teinté par le statut, sans bordure. */
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--st) 10%, var(--bg));
+  font-size: 13px;
+}
+
+/* Génération en cours : ce qui se fait, depuis quand, combien de temps encore, et de quoi l'arrêter. */
+.generation {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 12px 12px 12px 14px;
+  border-radius: var(--radius-m);
+  background: var(--bg);
+}
+
+.generation-text {
+  display: grid;
+  min-width: 0;
+}
+
+.generation-text strong {
+  display: block;
+  font-weight: 600;
+}
+
+.generation-text strong::first-letter {
+  text-transform: uppercase;
+}
+
+.timing {
+  white-space: nowrap;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.generation-bar {
+  grid-column: 1 / -1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: var(--raised);
+}
+
+.generation-bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width 0.4s;
+}
+
+.generation-bar.is-indeterminate span {
+  width: 35%;
+  animation: slide 1.4s ease-in-out infinite;
+}
+
+@keyframes slide {
+  from {
+    translate: -100%;
+  }
+  to {
+    translate: 290%;
+  }
+}
+
+.step-panel-body {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: 16px;
+  min-width: 0;
+}
+
+/* Pied de panneau : toujours visible en bas du panneau qui défile. */
+.step-panel-actions {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  margin: 0 -16px;
+  padding: 12px 16px 14px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.step-panel-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Contenu des panneaux */
+.panel-section + .panel-section {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.input-tall {
+  min-height: 120px;
+}
+
+.input-narrow {
+  width: 96px;
+}
+
+.empty-line {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.hint,
+.estimate {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.advanced {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.advanced summary {
+  width: max-content;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.advanced summary:hover,
+.advanced[open] summary {
+  color: var(--text);
+}
+
+.advanced-body,
+.add-element {
+  display: grid;
+  gap: 14px;
+  padding-top: 12px;
+}
+
+/* Badge inline dans le summary d'un <details class="advanced"> */
+.advanced-badge {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+/* Résumé compact du modèle sélectionné, affiché en tête du volet Avancé */
+.advanced-model-summary {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.advanced-model-summary strong {
+  color: var(--text);
+}
+
+.scene-focus {
+  display: grid;
+  gap: 12px;
+}
+
+.scene-focus-head {
+  display: grid;
+  gap: 4px;
+}
+
+.scene-list {
+  display: grid;
+  gap: 12px; /* espace que traverse le filet d'une scène enchaînée (Cast.css) */
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scene-card {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--bg);
+  scroll-margin: 12px;
+}
+
+/* Panneau étroit : vignette de carte réduite, comme sur mobile à l'écran Plan. */
+.studio-panel .scene-card {
+  --thumb-w: 44px;
+}
+
+.scene-card.is-selected {
+  border-color: var(--text);
+}
+
+.scene-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.scene-card-tools {
+  display: flex;
+  margin-left: auto;
+}
+
+.scene-card-tools .btn {
+  padding: 0 6px;
+}
+
+.scene-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.reference-image {
+  width: 160px;
+}
+
+.reference-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.reference-card {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+
+.story-elements,
+.story-elements-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.story-elements {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.scene-elements {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 13px;
+}
+
+.scene-elements legend {
+  padding: 0;
+  margin-bottom: 6px;
+  color: var(--muted);
+}
+
+.scene-element {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scene-element-thumb {
+  width: 28px;
+  height: 40px;
+  flex: none;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--surface-2, rgba(128, 128, 128, 0.15));
+}
+
+.variants {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.variant {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 4px;
+  border: 1.5px solid transparent;
+  border-radius: var(--radius-m);
+  transition: border-color var(--t-fast);
+}
+
+.variant.is-chosen {
+  border-color: var(--st-approved);
+  background: color-mix(in srgb, var(--st-approved) 8%, transparent);
+}
+
+.variant figcaption {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 2px 2px;
+  font-size: 13px;
+}
+
+.variant-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.variant-label {
+  font-weight: 500;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.variant-badge {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.variant-select-row {
+  display: flex;
+  width: 100%;
+}
+
+.variant-select-row .btn-choose {
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.variant-select-row .chosen-tag {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 4px 8px;
+  gap: 5px;
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--st-approved) 14%, transparent);
+  color: var(--st-approved);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.variants-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.variants-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.prompt-editor-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  margin-top: 14px;
+}
+
+.prompt-editor-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.prompt-editor-header h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.scene-generate-action {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.chosen-tag {
+  color: var(--st-approved);
+  font-weight: 500;
+}
+
+/* Volets repliables : flèche dessinée qui pivote à l'ouverture (remplace le triangle du navigateur). */
+.advanced > summary,
+.reprompt > summary,
+.panel-fold > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+}
+
+.advanced > summary::-webkit-details-marker,
+.reprompt > summary::-webkit-details-marker,
+.panel-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced > summary::before,
+.reprompt > summary::before,
+.panel-fold > summary::before {
+  content: "";
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 6 6 6-6 6'/%3E%3C/svg%3E") center / contain no-repeat;
+  transition: rotate var(--t-fast);
+}
+
+.advanced[open] > summary::before,
+.reprompt[open] > summary::before,
+.panel-fold[open] > summary::before {
+  rotate: 90deg;
+}
+
+/* Musique : liste à choix unique */
+.track-list {
+  display: grid;
+  gap: 6px;
+}
+
+.track {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.track.is-chosen {
+  border-color: var(--track-music);
+}
+
+.track input {
+  accent-color: var(--track-music);
+}
+
+.track-name {
+  display: grid;
+  gap: 2px;
+}
+
+.track-name .muted {
+  font-size: 12px;
+}
+
+.track .audio-player {
+  grid-column: 2;
+  max-width: none;
+}
+
+/* Aperçu 9:16 */
+.preview {
+  grid-area: preview;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  justify-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
+  padding: 20px 20px 14px;
+}
+
+.preview-frame {
+  position: relative;
+  height: 100%;
+  max-width: 100%;
+  aspect-ratio: 9 / 16;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: #000;
+  box-shadow: 0 20px 48px rgb(0 0 0 / 0.5);
+  container-type: inline-size; /* le sous-titre suit la largeur du cadre */
+}
+
+.preview-frame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+}
+
+.preview-frame:has(.preview-empty) {
+  border: 0;
+  background: none;
+}
+
+.preview-empty {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 24px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-m);
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* Sous-titre superposé (scène sans rendu) : à la place des sous-titres brûlés du montage. */
+.preview-subtitle {
+  position: absolute;
+  right: 8%;
+  bottom: 18%;
+  left: 8%;
+  color: var(--track-subs);
+  font-size: clamp(11px, 6.4cqw, 18px);
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  text-shadow:
+    0 1px 2px rgb(0 0 0 / 0.9),
+    0 0 12px rgb(0 0 0 / 0.6);
+  pointer-events: none;
+}
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.play {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--text);
+  color: var(--bg);
+  cursor: pointer;
+  transition: transform var(--t-fast);
+}
+
+.play:hover:not(:disabled) {
+  transform: scale(1.06);
+}
+
+.play:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.transport-time {
+  min-width: 92px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.transport-caption {
+  font-size: 13px;
+}
+
+/* Timeline */
+.timeline {
+  --ruler-h: 22px;
+  --clip-h: 60px;
+  --voice-h: 28px;
+  --music-h: 24px;
+  --lane-gap: 6px;
+  grid-area: timeline;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  padding: 8px 0 12px;
+  border-top: 1px solid var(--line);
+  background: var(--panel);
+}
+
+.tl-heads,
+.tl-tracks {
+  display: grid;
+  grid-template-rows: var(--ruler-h) var(--clip-h) var(--voice-h) var(--music-h);
+  row-gap: var(--lane-gap);
+}
+
+.tl-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Repère de couleur de la piste */
+.tl-head::before {
+  content: "";
+  width: 3px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--lane);
+}
+
+.lane-clip {
+  --lane: var(--track-clip);
+}
+.lane-voice {
+  --lane: var(--track-voice);
+}
+.lane-music {
+  --lane: var(--track-music);
+}
+
+.tl-scroll {
+  overflow-x: auto;
+  padding-right: 16px;
+}
+
+.tl-tracks {
+  position: relative;
+  min-width: max(100%, calc(var(--total-s) * 28px));
+}
+
+.tl-ruler {
+  position: relative;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.tick {
+  position: absolute;
+  bottom: 0;
+  height: 5px;
+  border-left: 1px solid var(--line);
+}
+
+.tick.is-major {
+  height: 9px;
+  border-color: var(--muted);
+}
+
+.tick.is-major:not(:empty) {
+  height: 100%;
+  padding: 1px 0 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.tl-lane {
+  position: relative;
+}
+
+.tl-block {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  margin-left: 1px;
+  padding: 0 6px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--lane) 70%, transparent);
+  border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--lane) 22%, var(--panel));
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  clip-path: inset(0 1px 0 0 round var(--radius-s)); /* intervalle entre blocs voisins */
+}
+
+.tl-block:hover {
+  background: color-mix(in srgb, var(--lane) 34%, var(--panel));
+}
+
+.tl-block[aria-current="true"] {
+  border: 2px solid var(--text);
+}
+
+.tl-block.is-generating[aria-current="true"] {
+  border-style: solid;
+}
+
+.tl-block:focus-visible {
+  outline-offset: -2px;
+}
+
+.tl-thumb {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+.tl-num {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgb(0 0 0 / 0.6);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+}
+
+.tl-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* En génération : rayures à la couleur de la piste, qui défilent lentement. */
+.tl-block.is-generating {
+  border-style: dashed;
+  background: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--lane) 30%, transparent) 0 6px,
+    transparent 6px 12px
+  );
+  background-size: 17px 17px;
+  animation: stripes 1.2s linear infinite;
+  cursor: progress;
+}
+
+@keyframes stripes {
+  to {
+    background-position: 17px 0;
+  }
+}
+
+/* Vide : pointillé et « + » qui ouvre l'outil. */
+.tl-block.is-empty {
+  justify-content: center;
+  border: 1px dashed var(--line);
+  background: none;
+  color: var(--muted);
+}
+
+.tl-block.is-empty:hover {
+  border-color: var(--lane);
+  color: var(--text);
+}
+
+.tl-music {
+  cursor: default;
+}
+
+.tl-none {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding-left: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tl-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 1;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  pointer-events: none;
+}
+
+.tl-playhead::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -4px;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px 2px 50% 50%;
+  background: var(--text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .autopilot-dot,
+  .scene-busy,
+  .stage-mark.is-running,
+  .generation-bar.is-indeterminate span,
+  .tl-block.is-generating {
+    animation: none;
+  }
+}
+
+.studio-tabs {
+  display: none;
+}
+
+/* Sous 900 px : l'éditeur tient dans l'écran. L'en-tête et la frise des étapes restent en haut, un seul volet occupe
+   le milieu (aperçu et timeline, scènes, ou panneau de l'étape) et la barre d'onglets est en bas, à portée du pouce. */
+@media (max-width: 900px) {
+  .studio {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+  }
+
+  .studio-head {
+    flex: none;
+    padding: 8px 12px;
+  }
+
+  .title-field {
+    flex: 1 1 100px;
+    min-width: 100px;
+  }
+
+  /* Exporter reste sur la ligne du titre ; l'état de l'autopilot passe sur la ligne suivante. */
+  .studio-actions {
+    display: contents;
+  }
+
+  .studio-actions > .btn {
+    order: 1;
+  }
+
+  .autopilot {
+    order: 2;
+    flex-basis: 100%;
+  }
+
+  .autopilot-text {
+    flex: 1;
+  }
+
+  .studio-error {
+    order: 3;
+  }
+
+  .pipeline {
+    flex: none;
+  }
+
+  /* L'activité passe sur sa propre ligne sous le titre, réduite à l'essentiel (le temps reste dans le panneau). */
+  .activity-bar {
+    order: 2;
+    flex-basis: 100%;
+    margin-inline: 0;
+  }
+
+  .activity {
+    flex: 1;
+  }
+
+  .activity-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  .activity .timing {
+    display: none;
+  }
+
+  .preview,
+  .scene-rail,
+  .studio-panel,
+  .timeline {
+    display: none;
+  }
+
+  .studio[data-pane="preview"] .preview,
+  .studio[data-pane="scenes"] .scene-rail,
+  .studio[data-pane="step"] .studio-panel {
+    display: flex;
+  }
+
+  .studio[data-pane="preview"] .timeline {
+    display: grid;
+  }
+
+  .preview {
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    min-height: 0;
+    padding: 14px 16px 10px;
+  }
+
+  .preview-frame {
+    flex: 1;
+    min-height: 0;
+    height: auto;
+    max-width: 100%;
+  }
+
+  .scene-actions {
+    flex-wrap: nowrap;
+    width: 100%;
+  }
+
+  .scene-actions .btn {
+    flex: 1;
+    padding: 0 8px;
+  }
+
+  .studio-head {
+    min-height: 0;
+  }
+
+  .studio-head .btn {
+    height: 32px;
+    padding: 0 12px;
+  }
+
+  .studio-actions > a.btn,
+  .studio-actions > button.btn:last-child {
+    padding: 0 10px;
+  }
+
+  .stage {
+    height: 40px;
+  }
+
+  .timeline {
+    --clip-h: 48px;
+    --voice-h: 26px;
+    --music-h: 22px;
+  }
+
+  .timeline {
+    flex: none;
+    max-height: 34dvh;
+    overflow-y: auto;
+  }
+
+  .scene-rail {
+    flex: 1;
+    min-height: 0;
+    border-right: 0;
+  }
+
+  .scene-rail ol {
+    padding-bottom: 16px;
+  }
+
+  .studio-panel {
+    flex: 1;
+    min-height: 0;
+    border-left: 0;
+  }
+
+  .studio-tabs {
+    flex: none;
+    display: flex;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: var(--panel);
+  }
+
+  .studio-tabs button {
+    display: grid;
+    flex: 1;
+    justify-items: center;
+    gap: 3px;
+    min-height: 48px;
+    padding: 6px 4px;
+    border: 0;
+    border-radius: var(--radius-s);
+    background: none;
+    color: var(--muted);
+    font: inherit;
+    font-size: 11.5px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .studio-tabs button[aria-current="page"] {
+    background: var(--raised);
+    color: var(--text);
+  }
+
+  .studio-tabs button[aria-current="page"] svg {
+    color: var(--accent);
+  }
+}
+
+/* Prompt d'une scène retravaillé : volet replié par défaut, comme « Avancé ». */
+.reprompt {
+  display: grid;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.reprompt summary {
+  width: max-content;
+  color: var(--text);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.reprompt[open] summary {
+  margin-bottom: 4px;
+}
+
+.reprompt textarea {
+  min-height: 150px;
+}
+
+.track-import {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+/* Actions de la scène sélectionnée, sous l'aperçu : disponibles quelle que soit l'étape ouverte. */
+.scene-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Style des sous-titres du montage : chaque tuile imite le rendu (fond de scène sombre, texte en bas). */
+.subtitle-styles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.subtitle-styles legend {
+  margin-bottom: 8px;
+  padding: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.subtitle-styles > .muted {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.subtitle-style {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.subtitle-style input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.subtitle-sample {
+  display: grid;
+  place-items: end center;
+  aspect-ratio: 9 / 12;
+  padding: 0 6px 12px;
+  border: 2px solid var(--line);
+  border-radius: var(--radius-m);
+  background: linear-gradient(180deg, #2a3a46, #0e1418);
+  color: #fff;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.is-classic .subtitle-sample {
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 0 3px #000;
+}
+
+.is-box .subtitle-sample {
+  background:
+    linear-gradient(rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.62)) center bottom 12px / 80% 2.6em no-repeat,
+    linear-gradient(180deg, #2a3a46, #0e1418);
+}
+
+.is-bold .subtitle-sample {
+  color: #ffe600;
+  font-size: 16px;
+  text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000;
+}
+
+.subtitle-style input:checked ~ .subtitle-sample {
+  border-color: var(--accent);
+}
+
+.subtitle-style input:focus-visible ~ .subtitle-sample {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.subtitle-name {
+  font-size: 13px;
+  text-align: center;
+}

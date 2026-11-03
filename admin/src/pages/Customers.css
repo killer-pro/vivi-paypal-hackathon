@@ -1,0 +1,30 @@
+/* Clients : recherche dans l'en-tête, pagination, formulaire d'ajustement (le bloc de solde vient de Credits.css). */
+.customers-search {
+  width: min(320px, 100%);
+}
+
+.customers-pager {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.adjust-form {
+  display: grid;
+  gap: 12px;
+  max-width: 760px;
+  margin: 0 0 28px;
+}
+
+.adjust-fields {
+  display: grid;
+  grid-template-columns: 1fr 160px 2fr;
+  gap: 12px;
+}
+
+@media (max-width: 720px) {
+  .adjust-fields {
+    grid-template-columns: 1fr;
+  }
+}

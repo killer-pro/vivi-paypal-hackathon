@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env: { POSTGRES_USER: vv, POSTGRES_PASSWORD: vv, POSTGRES_DB: video_virale_test }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U vv" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      PGPASSWORD: vv
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Dépendances système et dépendances Python
+        run: |
+          sudo apt-get update && sudo apt-get install -y ffmpeg
+          uv sync --frozen --extra dev --python 3.14
+      - name: Base de test des migrations et MinIO (stockage S3)
+        run: |
+          psql -h localhost -U vv -d video_virale_test -c "CREATE DATABASE video_virale_mig"
+          docker run -d --name minio -p 9100:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio server /data
+      - run: uv run --frozen ruff check app tests
+      - run: uv run --frozen mypy app
+      - run: uv run --frozen pytest -q
+
+  admin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: admin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm, cache-dependency-path: admin/package-lock.json }
+      - run: npm ci
+      - run: npx tsc -b
+      - run: npm run lint
+      - run: npm test

@@ -1,0 +1,154 @@
+/* Bloc « Nouvelle vidéo » : le sujet d'abord, les réglages et l'action sur une seule ligne. */
+.main > .composer {
+  display: grid;
+  gap: 20px;
+  max-width: var(--page-w-narrow);
+}
+
+.composer-head {
+  display: grid;
+  gap: 4px;
+}
+
+.composer-form {
+  display: grid;
+  gap: 20px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-l);
+  background: var(--panel);
+}
+
+.composer-subject {
+  min-height: 96px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.composer-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px 28px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.btn-large {
+  height: 42px;
+  padding: 0 22px;
+  font-size: 15px;
+}
+
+/* Modèles de départ : un clic remplit le sujet, la durée et la durée des scènes. */
+.templates {
+  display: grid;
+  gap: 8px;
+}
+
+.templates-title {
+  font-size: 13px;
+}
+
+.templates ul {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.template {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  height: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--t-fast),
+    background var(--t-fast);
+}
+
+.template span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.template:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.template:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* Mobile : modèles en bande défilante (six cartes empilées pousseraient le sujet hors de l'écran). */
+@media (max-width: 720px) {
+  .templates ul {
+    display: flex;
+    margin-inline: -14px;
+    padding: 2px 14px 6px;
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+  }
+
+  .templates li {
+    flex: none;
+    width: min(220px, 72vw);
+    scroll-snap-align: start;
+  }
+}
+
+@media (max-width: 720px) {
+  .composer-form {
+    padding: 14px;
+  }
+
+  .composer-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .composer-actions .btn-primary {
+    flex: 1;
+    justify-content: center;
+  }
+}
+
+.new-duration {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.new-duration .input {
+  width: 96px;
+}
+
+/* Invitation à s'abonner, au-dessus du formulaire, pour un compte sans abonnement. */
+.composer-subscribe {
+  padding: 10px 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-m);
+  background: var(--accent-soft);
+  font-size: 14px;
+}

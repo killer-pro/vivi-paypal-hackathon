@@ -1,0 +1,3 @@
+# Interface d'administration privée : rien à indexer.
+User-agent: *
+Disallow: /

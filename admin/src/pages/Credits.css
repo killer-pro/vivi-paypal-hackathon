@@ -1,0 +1,53 @@
+/* Crédits : solde en trois blocs (total, abonnement, rechargés), puis registre. */
+.credit-summary {
+  display: grid;
+  grid-template-columns: minmax(200px, 1.2fr) 1fr 1fr;
+  gap: 1px;
+  margin-bottom: 28px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--line); /* filets de 1px entre les blocs */
+}
+
+.credit-summary > * {
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 18px 20px;
+  background: var(--panel);
+  font-size: 13px;
+}
+
+.credit-summary strong {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.credit-summary .credit-total strong {
+  font-size: 34px;
+  line-height: 1.15;
+}
+
+.credit-history-title {
+  margin-bottom: 8px;
+}
+
+.credit-in {
+  color: var(--st-approved);
+}
+
+/* Sous un bouton de lancement : le manque de crédits. */
+.price-note {
+  margin: 0;
+  color: var(--st-awaiting);
+  font-size: 12.5px;
+}
+
+@media (max-width: 720px) {
+  .credit-summary {
+    grid-template-columns: 1fr;
+  }
+}

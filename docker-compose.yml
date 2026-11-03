@@ -1,0 +1,18 @@
+# Nom du projet Compose figé : les volumes (pgdata, miniodata) existants sont ceux de `video_virale-v1`.
+name: video_virale-v1
+services:
+  postgres:
+    image: postgres:16
+    environment: { POSTGRES_USER: vv, POSTGRES_PASSWORD: vv, POSTGRES_DB: video_virale }
+    ports: ["127.0.0.1:5432:5432"]  # liaison locale uniquement (identifiants de dev)
+    volumes: [pgdata:/var/lib/postgresql/data]
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:6379:6379"]
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment: { MINIO_ROOT_USER: minioadmin, MINIO_ROOT_PASSWORD: minioadmin }
+    ports: ["127.0.0.1:9100:9000", "127.0.0.1:9101:9001"]
+    volumes: [miniodata:/data]
+volumes: { pgdata: {}, miniodata: {} }
