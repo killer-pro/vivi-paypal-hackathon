@@ -690,3 +690,6 @@
 ## 2026-10-16
 - V1 : workflow de création vidéo + admin. Backend (providers réels et factices, journal des coûts, montage FFmpeg 9:16, pipeline en 8 étapes, API, worker Arq, SSE) et admin React (projets, éditeur de flow, musique, providers, coûts).
 - Documentation et lancement : `README.md`, `Makefile` (`up`, `migrate`, `api`, `worker`, `admin`, `test`), `docs/architecture.md`, mise à jour de `providers.md`, `workflow-video.md`, `montage.md`, `music.md`.
+
+## 2026-11-03 (badge de crédits)
+- Admin : la pastille de crédits de la barre latérale se recharge après une recharge (`notifyCreditsChanged` dans `hooks/useCredits.ts`), sans rafraîchir la page.

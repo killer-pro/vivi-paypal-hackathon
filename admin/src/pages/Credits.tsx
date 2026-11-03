@@ -5,7 +5,7 @@ import BillingOffers from "../components/BillingOffers";
 import { ErrorState } from "../components/ui";
 import { formatCredits, kindLabel, type CreditEntry, type CreditsPage } from "../credits";
 import { dateTime } from "../format";
-import { useCredits } from "../hooks/useCredits";
+import { notifyCreditsChanged, useCredits } from "../hooks/useCredits";
 import { STEP_LABELS, type StepName } from "../steps";
 import "./Credits.css";
 
@@ -64,7 +64,7 @@ export default function Credits() {
         </div>
       </section>
 
-      {!data.unlimited && <BillingOffers onPaid={reload} />}
+      {!data.unlimited && <BillingOffers onPaid={notifyCreditsChanged} />}
 
       <h2 className="credit-history-title">Historique</h2>
       {entries.length === 0 ? (
