@@ -100,8 +100,8 @@ Les clips peuvent être générés gratuitement par une instance ComfyUI locale 
   `dev-secret` dans `config.py`) sont réservés au local (`APP_ENV=dev`, valeur par défaut) : l'API logue un
   avertissement au démarrage. Avec `APP_ENV=prod` (ou toute valeur autre que `dev`), elle refuse de démarrer tant
   qu'ils sont utilisés, pose le cookie de session en `Secure` (HTTPS requis) et ferme `/docs`.
-- Postgres, Redis et MinIO (identifiants de dev) n'écoutent que sur `127.0.0.1` (ports 5432, 6379, 9100 pour l'API S3,
-  9101 pour la console ; 9100/9101 pour ne pas entrer en conflit avec un MinIO local sur 9000/9001).
+- Postgres, Redis et le stockage S3 (RustFS, identifiants de dev) n'écoutent que sur `127.0.0.1` (ports 5432, 6379, 9100 pour l'API S3 ;
+  9100 pour ne pas entrer en conflit avec un S3 local sur 9000).
 - Clés API saisies dans l'écran Réglages : relues à chaque job par le worker (et à chaque requête par l'API), sans
   redémarrage. Variables d'environnement (`backend/.env`, dont `FAKE_PROVIDERS`) et code : lues au démarrage,
   redémarrer API **et** worker après modification.

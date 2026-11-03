@@ -30,8 +30,8 @@ jobs:
       - name: Base de test des migrations et MinIO (stockage S3)
         run: |
           psql -h localhost -U vv -d video_virale_test -c "CREATE DATABASE video_virale_mig"
-          docker run -d --name minio -p 9100:9000 -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
-            minio/minio server /data
+          docker run -d --name minio -p 9100:9000 -e RUSTFS_ACCESS_KEY=minioadmin -e RUSTFS_SECRET_KEY=minioadmin \
+            rustfs/rustfs:latest
       - run: uv run --frozen ruff check app tests
       - run: uv run --frozen mypy app
       - run: uv run --frozen pytest -q
