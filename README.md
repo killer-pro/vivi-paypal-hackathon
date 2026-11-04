@@ -94,17 +94,3 @@ Les clips peuvent être générés gratuitement par une instance ComfyUI locale 
    Maximum ≈ 18 min. La RAM libre compte autant que le profil (Maximum : 45 min avec le swap saturé). Les clips d'un
    projet sont générés un à la fois en local (avec fal.ai : jusqu'à 3 en parallèle). Catalogue et benchmark :
    `docs/profils-generation.md`.
-
-## Limites connues
-- `ADMIN_PASSWORD` et `SECRET_KEY` par défaut (`change-me` / `change-me-too` dans `.env.example`, `change-me` /
-  `dev-secret` dans `config.py`) sont réservés au local (`APP_ENV=dev`, valeur par défaut) : l'API logue un
-  avertissement au démarrage. Avec `APP_ENV=prod` (ou toute valeur autre que `dev`), elle refuse de démarrer tant
-  qu'ils sont utilisés, pose le cookie de session en `Secure` (HTTPS requis) et ferme `/docs`.
-- Postgres, Redis et le stockage S3 (RustFS, identifiants de dev) n'écoutent que sur `127.0.0.1` (ports 5432, 6379, 9100 pour l'API S3 ;
-  9100 pour ne pas entrer en conflit avec un S3 local sur 9000).
-- Clés API saisies dans l'écran Réglages : relues à chaque job par le worker (et à chaque requête par l'API), sans
-  redémarrage. Variables d'environnement (`backend/.env`, dont `FAKE_PROVIDERS`) et code : lues au démarrage,
-  redémarrer API **et** worker après modification.
-- Supprimer un projet ou une piste musique supprime aussi ses fichiers MinIO (ceux d'avant cette version restent à nettoyer à la main) ; un projet ne peut pas être supprimé pendant une génération.
-- Les secrets ne peuvent pas être effacés depuis l'admin (une valeur masquée est ignorée ; une valeur vide fait retomber sur la variable d'environnement).
-- L'image de référence n'est pas transmise aux modèles texte-vers-vidéo de fal.ai en V1.
