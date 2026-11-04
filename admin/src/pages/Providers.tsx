@@ -51,6 +51,15 @@ const PROVIDERS: ProviderCard[] = [
     ],
   },
   {
+    id: "ollama",
+    name: "Ollama",
+    role: "Idées, scripts et métadonnées sur votre machine, sans clé ni coût",
+    fields: [
+      { key: "ollama_url", label: "URL du serveur" },
+      { key: "ollama_model", label: "Modèle (téléchargé avec « ollama pull »)" },
+    ],
+  },
+  {
     id: "fal",
     name: "fal.ai",
     role: "Clips vidéo et images de référence",
@@ -82,7 +91,7 @@ const PROVIDERS: ProviderCard[] = [
   },
 ];
 
-const LLM_PROVIDER_LABELS: Record<string, string> = { claude: "Claude", gemini: "Gemini" };
+const LLM_PROVIDER_LABELS: Record<string, string> = { claude: "Claude", gemini: "Gemini", ollama: "Ollama (local)" };
 
 /** Secrets affichés vides : on n'y saisit qu'une nouvelle valeur. */
 const draftOf = (saved: Settings): Settings =>

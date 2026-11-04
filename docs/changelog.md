@@ -693,3 +693,8 @@
 
 ## 2026-11-03 (badge de crédits)
 - Admin : la pastille de crédits de la barre latérale se recharge après une recharge (`notifyCreditsChanged` dans `hooks/useCredits.ts`), sans rafraîchir la page.
+
+## 2026-11-04 (texte en local)
+- Nouveau provider de texte `ollama` (`providers/ollama.py`) : idées, scripts et métadonnées générés par un modèle local, sans clé ni coût. Réglages `ollama_url` / `ollama_model`, carte dans Réglages → Providers, santé dans `/api/providers/health`. Pensé pour travailler sans carte bancaire.
+- Ollama : `gemma4` par défaut (meilleur compromis mesuré sur 2 idées : 9 s, JSON valide, bon français) et `keep_alive: 0` (le modèle quitte la RAM après chaque réponse, au profit de ComfyUI).
+- Image de référence locale : provider `comfyui` (`ComfyUIImage`, Flux dev, modèle `flux-dev`), choisissable dans Réglages → Image de référence ; aucune clé, aucun coût.

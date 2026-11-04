@@ -17,7 +17,7 @@ from app.app_settings import VOICE_ID, AppSettings, parse_voice_catalog
 from app.models import Asset, MusicTrack, Project, Scene, Step
 from app.providers.base import GenerationResult, ProviderError, TextResult, split_prompt
 from app.providers.comfyui import CLIP_TIMEOUT_S as COMFYUI_CLIP_TIMEOUT_S
-from app.providers.comfyui import KONTEXT_PREFIX
+from app.providers.comfyui import KONTEXT_PREFIX, ComfyUIImage
 from app.providers.fal import IMAGE_MODELS
 from app.providers.registry import ProviderRegistry
 from app.services import credits, langfuse, montage, styles
@@ -166,7 +166,8 @@ async def reference_choice(params: dict, app_settings: AppSettings) -> tuple[str
     par défaut (`gemini_image_model`, ou Flux pour fal). Un ancien paramètre `model: flux` sans provider vaut fal."""
     provider = params.get("provider") or ("fal" if params.get("model") in IMAGE_MODELS
                                           else await app_settings.get("image_provider"))
-    default = await app_settings.get("gemini_image_model") if provider == "gemini" else next(iter(IMAGE_MODELS))
+    default = (await app_settings.get("gemini_image_model") if provider == "gemini"
+               else ComfyUIImage.MODEL if provider == "comfyui" else next(iter(IMAGE_MODELS)))
     return provider, params.get("model") or default
 
 

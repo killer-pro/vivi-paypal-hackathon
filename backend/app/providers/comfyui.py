@@ -15,7 +15,7 @@ from app.providers.base import (
     raise_for_provider,
     split_prompt,
 )
-from app.providers.profiles import PROFILES, ModelFile, get_profile, required_files
+from app.providers.profiles import PROFILES, ModelFile, flux_files, get_profile, required_files
 from app.providers.workflows import i2v_workflow, keyframe_workflow, kontext_workflow, t2v_workflow
 
 # Génération locale (Wan 2.2 sur Mac : de 5 à 46 min par clip) : timeout d'un appel bien plus long que pour un
@@ -269,3 +269,25 @@ class ComfyUIProvider:
             return await self._responds()
         except CONNECTION_ERRORS:
             return False
+
+
+class ComfyUIImage:
+    """Image de référence générée par Flux dev sur votre ComfyUI (même graphe que l'image de départ du profil
+    Précision, 576×1008) : gratuite, mais ≈ 2 min par image sur un Mac."""
+
+    name = "comfyui"
+    MODEL = "flux-dev"
+
+    def __init__(self, comfy: ComfyUIProvider):
+        self._comfy = comfy
+
+    async def generate(self, prompt, *, model, references=()):
+        still, _ = split_prompt(prompt)
+        png = await self._comfy._run(keyframe_workflow(get_profile(PROFILES[0].id), still, _seed()), "image de référence")
+        return GenerationResult(png, "image/png", 0.0, model)
+
+    async def image_availability(self) -> dict[str, Availability]:
+        return await self._comfy._availability({self.MODEL: flux_files()})
+
+    async def health(self) -> bool:
+        return await self._comfy.health()

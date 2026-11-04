@@ -89,7 +89,7 @@ export const START_IMAGE_LABELS: Record<string, string> = {
   gemini: "Gemini (payant, environ 0,08 $ par scène)",
 };
 
-export const IMAGE_PROVIDER_LABELS: Record<string, string> = { gemini: "Gemini", fal: "fal.ai" };
+export const IMAGE_PROVIDER_LABELS: Record<string, string> = { gemini: "Gemini", fal: "fal.ai", comfyui: "ComfyUI (local)" };
 
 /** Modèle d'image du choix, parmi les cartes `image` de `/providers/models`. */
 function imageCard(cards: ModelStatus[], choice: Choice): ModelStatus | undefined {

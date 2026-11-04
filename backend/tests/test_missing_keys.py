@@ -149,12 +149,12 @@ async def test_reference_uses_the_image_provider_setting(api, session, real_prov
 async def test_models_endpoint_exposes_image_availability_per_provider(api, real_providers):
     image = (await api.get("/api/providers/models")).json()["image"]
     assert [(c["provider"], c["id"]) for c in image] == [("gemini", m) for m in image_models(DEFAULT_IMAGE_MODEL)] + [
-        ("fal", "flux")]
+        ("fal", "flux"), ("comfyui", "flux-dev")]
     assert image[0] == {"provider": "gemini", "id": DEFAULT_IMAGE_MODEL, "name": DEFAULT_IMAGE_MODEL,
                         "available": False, "reason": GEMINI_KEY_MISSING}
-    assert image[-1]["reason"] == FAL_KEY_MISSING
+    assert image[-2]["reason"] == FAL_KEY_MISSING
     assert (await api.put("/api/settings", json={"gemini_api_key": "g", "gemini_image_model": "gemini-9-image"})
             ).status_code == 200
     image = (await api.get("/api/providers/models")).json()["image"]
     assert image[0]["id"] == "gemini-9-image"
-    assert [c["available"] for c in image if c["provider"] == "gemini"] == [True] * (len(image) - 1)
+    assert [c["available"] for c in image if c["provider"] == "gemini"] == [True] * (len(image) - 2)

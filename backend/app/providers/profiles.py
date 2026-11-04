@@ -45,6 +45,16 @@ def get_profile(model: str) -> Profile:
     raise KeyError(model)
 
 
+def flux_files(*, kontext: bool = False) -> list[ModelFile]:
+    """Fichiers de Flux (dev, ou Kontext pour replacer une image de référence) avec ses encodeurs de texte et son VAE."""
+    return [
+        ModelFile("UnetLoaderGGUF", "unet_name", "flux1-kontext-dev-Q4_K_S.gguf" if kontext else "flux1-dev-Q4_K_S.gguf"),
+        ModelFile("DualCLIPLoader", "clip_name1", "clip_l.safetensors"),
+        ModelFile("DualCLIPLoader", "clip_name2", "t5xxl_fp8_e4m3fn.safetensors"),
+        ModelFile("VAELoader", "vae_name", "ae.safetensors"),
+    ]
+
+
 def required_files(profile: Profile, *, reference: bool = False) -> list[ModelFile]:
     """Fichiers d'un profil. `reference` : avec une image de référence, toute scène part d'une image de départ
     (Flux Kontext replace la référence dans la scène) puis de l'animation Wan I2V, quel que soit le profil."""
@@ -60,13 +70,7 @@ def required_files(profile: Profile, *, reference: bool = False) -> list[ModelFi
         ModelFile("VAELoader", "vae_name", "wan_2.1_vae.safetensors"),
     ]
     if profile.keyframe or reference:
-        flux = "flux1-kontext-dev-Q4_K_S.gguf" if reference else "flux1-dev-Q4_K_S.gguf"
-        files += [
-            ModelFile("UnetLoaderGGUF", "unet_name", flux),
-            ModelFile("DualCLIPLoader", "clip_name1", "clip_l.safetensors"),
-            ModelFile("DualCLIPLoader", "clip_name2", "t5xxl_fp8_e4m3fn.safetensors"),
-            ModelFile("VAELoader", "vae_name", "ae.safetensors"),
-        ]
+        files += flux_files(kontext=reference)
     if profile.esrgan:
         files.append(ModelFile("UpscaleModelLoader", "model_name", "ESRGAN/4x-UltraSharp.pth"))
     return files

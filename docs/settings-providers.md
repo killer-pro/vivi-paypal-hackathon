@@ -12,7 +12,7 @@ l'administrateur (`ADMIN_ONLY`, `403 "Réservé à l'administrateur"` pour un au
   `claude` ni `gemini`, ou si `gemini_model` contient autre chose que des lettres, chiffres, `.`, `_`, `-`
   (rien n'est écrit).
   Une valeur commençant par `••••` (secret renvoyé tel quel) est ignorée : elle n'écrase pas le secret.
-- `GET /api/providers/health` : `{claude, gemini, fal, comfyui, elevenlabs, langfuse}` (booléens ; Claude, Gemini et ElevenLabs = clé acceptée par le service, testée par un appel gratuit de 10 s max ; fal = clé renseignée, faute de point d'entrée gratuit ; ComfyUI = serveur joignable ; Langfuse = clés acceptées, voir `langfuse.md`). L'admin affiche « Non connecté » pour tout `false` (clé absente, refusée ou service injoignable).
+- `GET /api/providers/health` : `{claude, gemini, ollama, fal, comfyui, elevenlabs, langfuse}` (booléens ; Claude, Gemini et ElevenLabs = clé acceptée par le service, testée par un appel gratuit de 10 s max ; fal = clé renseignée, faute de point d'entrée gratuit ; ComfyUI = serveur joignable ; Langfuse = clés acceptées, voir `langfuse.md`). L'admin affiche « Non connecté » pour tout `false` (clé absente, refusée ou service injoignable).
 - `GET /api/providers/models` : `{"video": [carte, ...], "image": [{provider, id, name, available, reason}], "llm": {"gemini": [...]}}`
   (`image` : modèles de l'image de référence de chaque provider, Gemini (`gemini_image_model` puis `IMAGE_PRICES`) puis
   fal (`flux`), grisés sans la clé du provider (« Clé API gemini manquante, à saisir dans Réglages → Gemini »), `services/video_models.py::image_cards`) ; carte =

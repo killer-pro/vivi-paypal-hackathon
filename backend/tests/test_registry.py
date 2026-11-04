@@ -36,7 +36,7 @@ async def test_registry_fake_mode(session):
     for name in reg.VIDEO_PROVIDER_NAMES:
         assert (await reg.video(name)).name == "fake-video"
     report = await reg.health_report()
-    assert set(report) == {"claude", "gemini", "fal", "comfyui", "elevenlabs", "langfuse"} and all(report.values())
+    assert set(report) == {"claude", "gemini", "ollama", "fal", "comfyui", "elevenlabs", "langfuse"} and all(report.values())
 
 
 async def test_registry_unknown_video_provider(session):

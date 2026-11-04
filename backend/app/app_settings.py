@@ -8,6 +8,8 @@ from app.crypto import decrypt, encrypt
 from app.models import Setting
 from app.providers.gemini import DEFAULT_IMAGE_MODEL as GEMINI_DEFAULT_IMAGE_MODEL
 from app.providers.gemini import DEFAULT_MODEL as GEMINI_DEFAULT_MODEL
+from app.providers.ollama import DEFAULT_MODEL as OLLAMA_DEFAULT_MODEL
+from app.providers.ollama import DEFAULT_URL as OLLAMA_DEFAULT_URL
 from app.providers.profiles import DEFAULT_PROFILE, LEGACY_NAMES
 from app.services.access import DEFAULT_LOCKED, parse_locked
 from app.services.billing import DEFAULT_BILLING, parse_billing
@@ -19,7 +21,7 @@ CREDIT_KEYS = ("credits_usd_per_credit", "credits_margin", "credits_signup_grant
 SECRET_KEYS = {"anthropic_api_key", "gemini_api_key", "fal_key", "elevenlabs_api_key", "langfuse_secret_key", "smtp_password",
                 "stripe_secret_key", "stripe_webhook_secret", "paypal_client_secret"}
 EDITABLE_KEYS = SECRET_KEYS | {"comfyui_url", "default_voice_id", "voice_catalog", "default_video_provider", "default_video_model",
-                               "llm_provider", "gemini_model", "project_budget_usd", "image_provider",
+                               "llm_provider", "gemini_model", "ollama_url", "ollama_model", "project_budget_usd", "image_provider",
                                "start_image_provider", "gemini_image_model", "langfuse_public_key", "langfuse_base_url",
                                "smtp_host", "smtp_port", "smtp_user", "smtp_sender", "paypal_client_id", "paypal_webhook_id", "paypal_mode",
                                *CREDIT_KEYS}
@@ -27,18 +29,19 @@ EDITABLE_KEYS = SECRET_KEYS | {"comfyui_url", "default_voice_id", "voice_catalog
 EDITOR_KEYS = {"default_voice_id", "voice_catalog", "default_video_provider", "default_video_model", "image_provider",
                "start_image_provider"}
 DEFAULTS = {"default_voice_id": "", "voice_catalog": "[]", "default_video_provider": "comfyui", "default_video_model": DEFAULT_PROFILE,
-            "llm_provider": "claude", "gemini_model": GEMINI_DEFAULT_MODEL, "project_budget_usd": "10",
+            "llm_provider": "claude", "gemini_model": GEMINI_DEFAULT_MODEL,
+            "ollama_url": OLLAMA_DEFAULT_URL, "ollama_model": OLLAMA_DEFAULT_MODEL, "project_budget_usd": "10",
             "image_provider": "gemini", "start_image_provider": "comfyui", "gemini_image_model": GEMINI_DEFAULT_IMAGE_MODEL,
             "smtp_port": "587", "credits_usd_per_credit": "0.05", "credits_margin": "2.5", "credits_signup_grant": "100",
             "credits_reservation_timeout_min": "30", "credits_max_parallel_clips": "1", "credits_pricing": DEFAULT_PRICING,
             "subscription_locked": DEFAULT_LOCKED, "billing_config": DEFAULT_BILLING, "paypal_mode": "sandbox"}
-LLM_PROVIDERS = ("claude", "gemini")
+LLM_PROVIDERS = ("claude", "gemini", "ollama")
 START_IMAGE_PROVIDERS = ("comfyui", "gemini")  # image de départ de chaque scène : Flux Kontext (local) ou Gemini
-IMAGE_PROVIDERS = ("gemini", "fal")  # image de référence ; Gemini par défaut (même clé que la rédaction)
+IMAGE_PROVIDERS = ("gemini", "fal", "comfyui")  # image de référence ; Gemini par défaut (même clé que la rédaction)
 # Réglages à valeurs fermées : une autre valeur est refusée à l'écriture.
 CHOICES = {"paypal_mode": ("sandbox", "live"), "llm_provider": LLM_PROVIDERS, "image_provider": IMAGE_PROVIDERS, "start_image_provider": START_IMAGE_PROVIDERS}
 # Réglages au format contraint (vide = retour au défaut) : un identifiant de modèle finit dans une URL.
-PATTERNS = {key: re.compile(r"[A-Za-z0-9._-]+") for key in ("gemini_model", "gemini_image_model")}
+PATTERNS = {key: re.compile(r"[A-Za-z0-9._-]+") for key in ("gemini_model", "gemini_image_model", "ollama_model")}
 # Anciennes valeurs remplacées : lues et écrites sous leur nouveau nom (`workflow` d'avant les profils → `max`).
 RENAMED = {"default_video_model": LEGACY_NAMES}
 # Identifiant de voix : inséré dans l'URL du provider, donc limité à des caractères sûrs (ni « / » ni « . »).
