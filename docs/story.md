@@ -1,6 +1,6 @@
 # Histoire (étape `story`)
 
-Code : `backend/app/services/story.py` (fonctions pures : schémas, lecture, contrôles) et `pipeline.py` (`_story`, `_script`).
+Code : `backend/app/services/story.py` (fonctions pures : schémas, lecture, contrôles) et `pipeline.py` (`_story`, `_script`) avec les prompts de `prompts.py`.
 Admin : `admin/src/story.ts`, `hooks/useStoryDraft.ts`, `components/plan/StoryView.tsx`, `panels/StoryPanel.tsx`.
 
 ## Pourquoi

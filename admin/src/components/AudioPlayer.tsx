@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { clock } from "../format";
 import { PauseIcon, PlayIcon } from "./icons";
 import "./AudioPlayer.css";
+import { t } from "../i18n";
 
 /** Lecteur en cours : une seule piste joue à la fois dans la page. */
 let current: HTMLAudioElement | null = null;
@@ -42,7 +43,7 @@ export default function AudioPlayer({ src, label, className }: { src: string; la
         onLoadedMetadata={(e) => setDuration(e.currentTarget.duration)}
         onEnded={() => setTime(0)}
       />
-      <button type="button" className="audio-play" onClick={toggle} aria-label={`${playing ? "Mettre en pause" : "Écouter"} : ${label}`}>
+      <button type="button" className="audio-play" onClick={toggle} aria-label={t("{action} : {label}", { action: playing ? t("Mettre en pause") : t("Écouter"), label })}>
         {playing ? <PauseIcon /> : <PlayIcon />}
       </button>
       <input

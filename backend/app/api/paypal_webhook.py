@@ -12,8 +12,9 @@ router = APIRouter(tags=["billing"])
 @router.post("/paypal/webhook")
 async def paypal_webhook(request: Request, session: AsyncSession = Depends(get_session),
                          paypal: PayPalAPI = Depends(get_paypal)) -> dict:
-    """Webhook PayPal : ouvert (pas de session), signature vérifiée par PayPal. Filet de sécurité de la capture : un
-    client qui ferme l'onglet avant le retour est tout de même crédité, sans double crédit (même identifiant de capture)."""
+    """Webhook PayPal : ouvert (pas de session), signature vérifiée par PayPal. Filet de sécurité de la capture et de
+    l'abonnement : un client qui ferme l'onglet avant le retour est tout de même crédité, sans double crédit (même identifiant
+    de capture, même cycle d'abonnement)."""
     try:
         event = await request.json()
     except ValueError as e:
@@ -26,8 +27,9 @@ async def paypal_webhook(request: Request, session: AsyncSession = Depends(get_s
         raise HTTPException(502, f"Vérification indisponible : {e}") from e
     if not valid:
         raise HTTPException(400, "Signature invalide")
-    added = 0
-    if event.get("event_type") == "PAYMENT.CAPTURE.COMPLETED" and isinstance(event.get("resource"), dict):
-        added = await payments.apply_paypal_capture(session, event["resource"], AppSettings(session))
-        await session.commit()
+    try:
+        added = await payments.handle_paypal_event(session, event, paypal, AppSettings(session))
+    except PayPalError as e:  # PayPal rejoue l'événement : on ne l'acquitte pas tant que l'abonnement n'a pas pu être lu
+        raise HTTPException(502, f"Lecture de l'abonnement indisponible : {e}") from e
+    await session.commit()
     return {"received": True, "credited": added}

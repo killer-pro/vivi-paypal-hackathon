@@ -3,8 +3,8 @@ import json
 import httpx
 import pytest
 
-from app.providers.base import ProviderError
-from app.providers.ollama import OllamaLLM, lower_types
+from app.providers.base import ProviderError, standard_schema
+from app.providers.ollama import OllamaLLM
 
 
 def llm(handler, model="qwen3:14b") -> OllamaLLM:
@@ -15,10 +15,13 @@ def chat(content="{}", **extra) -> httpx.Response:
     return httpx.Response(200, json={"message": {"content": content}, "prompt_eval_count": 7, "eval_count": 3, **extra})
 
 
-def test_lower_types_converts_gemini_schema():
-    schema = {"type": "OBJECT", "properties": {"scenes": {"type": "ARRAY", "items": {"type": "STRING"}}}, "required": ["scenes"]}
-    assert lower_types(schema) == {"type": "object", "properties": {"scenes": {"type": "array", "items": {"type": "string"}}},
-                                   "required": ["scenes"]}
+def test_standard_schema_converts_gemini_schema():
+    schema = {"type": "OBJECT", "properties": {"scenes": {"type": "ARRAY", "items": {"type": "STRING"}},
+                                               "id": {"type": "INTEGER", "nullable": True}},
+              "required": ["scenes"], "propertyOrdering": ["scenes", "id"]}
+    assert standard_schema(schema) == {"type": "object", "properties": {"scenes": {"type": "array", "items": {"type": "string"}},
+                                                                        "id": {"type": ["integer", "null"]}},
+                                       "required": ["scenes"]}
 
 
 async def test_complete_sends_schema_and_returns_free_text():
@@ -62,13 +65,3 @@ async def test_health_requires_the_chosen_model_to_be_installed():
     latest = lambda r: httpx.Response(200, json={"models": [{"name": "gemma4:latest"}]})  # noqa: E731
     assert await llm(latest, model="gemma4").health()
     assert not await llm(lambda r: httpx.Response(500)).health()
-
-
-async def test_reference_choice_defaults_to_flux_dev_on_comfyui(session):
-    from app.app_settings import AppSettings
-    from app.services.pipeline import reference_choice
-
-    s = AppSettings(session)
-    await s.set("image_provider", "comfyui")
-    assert await reference_choice({}, s) == ("comfyui", "flux-dev")
-    assert await reference_choice({"model": "flux"}, s) == ("fal", "flux")

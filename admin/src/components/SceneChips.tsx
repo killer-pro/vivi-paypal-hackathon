@@ -2,6 +2,7 @@ import type { Scene } from "../api";
 import { sceneElements, sceneLink, type CastMember } from "../casting";
 import { ELEMENT_KINDS } from "../story";
 import "./Cast.css";
+import { t } from "../i18n";
 
 /** Éléments visibles d'une scène (avec leur état) puis son enchaînement avec la précédente. */
 export default function SceneChips({
@@ -24,7 +25,7 @@ export default function SceneChips({
   return (
     <div className="scene-chips">
       {elements.length > 0 && (
-        <ul className="cast-chips" aria-label="Éléments visibles">
+        <ul className="cast-chips" aria-label={t("Éléments visibles")}>
           {elements.map(({ member, state }) => (
             <li key={member.id} className="cast-chip" title={ELEMENT_KINDS[member.kind]}>
               <span>{member.name}</span>
@@ -35,7 +36,7 @@ export default function SceneChips({
       )}
       {link && (
         <p className={`scene-link is-${link.kind}`}>
-          {link.kind === "chain" ? `Enchaînée : part de la dernière image de la scène ${link.from}` : "Coupe"}
+          {link.kind === "chain" ? t("Enchaînée : part de la dernière image de la scène {n}", { n: link.from ?? "" }) : t("Coupe")}
         </p>
       )}
     </div>

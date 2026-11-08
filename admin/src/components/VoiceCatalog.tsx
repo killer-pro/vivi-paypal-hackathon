@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api, errorMessage } from "../api";
 import { parseVoices, type Voice } from "../settings";
 import { Field } from "./ui";
+import { t } from "../i18n";
 
 const VOICE_ID = /^[A-Za-z0-9_-]{1,64}$/;
 
@@ -18,8 +19,8 @@ export default function VoiceCatalog({ value, onChange }: { value: string; onCha
   // Pas de <form> : le catalogue est dans le formulaire des réglages (les formulaires ne s'imbriquent pas).
   function add() {
     const voiceId = id.trim();
-    if (!name.trim() || !VOICE_ID.test(voiceId)) return setError("Indiquez un nom et un identifiant (lettres, chiffres, _ et -).");
-    if (voices.some((v) => v.id === voiceId)) return setError("Cet identifiant est déjà au catalogue.");
+    if (!name.trim() || !VOICE_ID.test(voiceId)) return setError(t("Indiquez un nom et un identifiant (lettres, chiffres, _ et -)."));
+    if (voices.some((v) => v.id === voiceId)) return setError(t("Cet identifiant est déjà au catalogue."));
     save([...voices, { id: voiceId, name: name.trim() }]);
     setName("");
     setId("");
@@ -41,9 +42,9 @@ export default function VoiceCatalog({ value, onChange }: { value: string; onCha
 
   return (
     <div className="voice-catalog">
-      <h3>Catalogue de voix</h3>
+      <h3>{t("Catalogue de voix")}</h3>
       {voices.length === 0 ? (
-        <p className="muted">Aucune voix. Importez celles de votre compte ou ajoutez-en une avec son identifiant.</p>
+        <p className="muted">{t("Aucune voix. Importez celles de votre compte ou ajoutez-en une avec son identifiant.")}</p>
       ) : (
         <ul className="voice-list">
           {voices.map((v) => (
@@ -54,20 +55,20 @@ export default function VoiceCatalog({ value, onChange }: { value: string; onCha
               <button
                 type="button"
                 className="btn btn-ghost btn-small"
-                aria-label={`Retirer la voix ${v.name}`}
+                aria-label={t("Retirer la voix {name}", { name: v.name })}
                 onClick={() => save(voices.filter((x) => x.id !== v.id))}
               >
-                Retirer
+                {t("Retirer")}
               </button>
             </li>
           ))}
         </ul>
       )}
       <div className="voice-add">
-        <Field label="Nom de la voix">
+        <Field label={t("Nom de la voix")}>
           <input className="input" maxLength={80} value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
-        <Field label="Identifiant ElevenLabs">
+        <Field label={t("Identifiant ElevenLabs")}>
           <input
             className="input"
             maxLength={64}
@@ -78,7 +79,7 @@ export default function VoiceCatalog({ value, onChange }: { value: string; onCha
           />
         </Field>
         <button type="button" className="btn" onClick={add}>
-          Ajouter
+          {t("Ajouter")}
         </button>
         <button type="button" className="btn" onClick={importFromAccount} disabled={importing}>
           {importing ? "Import…" : "Importer depuis ElevenLabs"}
@@ -89,7 +90,7 @@ export default function VoiceCatalog({ value, onChange }: { value: string; onCha
           {error}
         </p>
       )}
-      <small className="muted">Les changements s'appliquent après « Enregistrer ».</small>
+      <small className="muted">{t("Les changements s'appliquent après « Enregistrer ».")}</small>
     </div>
   );
 }

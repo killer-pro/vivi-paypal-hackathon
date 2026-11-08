@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  durationOptions,
   canCreate,
   DURATIONS,
   fromTemplate,
@@ -81,12 +82,24 @@ describe("styleOptions réservés", () => {
         { id: "anime", label: "Anime" },
       ],
       ["anime"],
-      "Réservé à l'abonnement : les styles visuels",
+      "Réservé au forfait Starter : les styles visuels",
     );
     expect(options).toEqual([
       { value: "", label: "Aucun" },
       { value: "realistic", label: "Réaliste" },
-      { value: "anime", label: "Anime", disabled: true, hint: "Réservé à l'abonnement : les styles visuels" },
+      { value: "anime", label: "Anime", disabled: true, hint: "Réservé au forfait Starter : les styles visuels" },
     ]);
+  });
+});
+
+describe("durationOptions", () => {
+  it("désactive les durées au-delà du forfait, avec le motif", () => {
+    expect(durationOptions(30, "Limite")).toEqual([
+      { value: "15", label: "15 s" },
+      { value: "30", label: "30 s" },
+      { value: "45", label: "45 s", disabled: true, hint: "Limite" },
+      { value: "60", label: "60 s", disabled: true, hint: "Limite" },
+    ]);
+    expect(durationOptions(undefined).every((o) => !o.disabled)).toBe(true);
   });
 });

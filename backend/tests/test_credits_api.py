@@ -22,13 +22,13 @@ async def test_verify_grants_signup_credits_once(api_as, session, mailer):
     user = await user_by_email(session, "a@x.com")
     c = await api_as(user)
     body = await _balance(c)
-    assert body["balance"] == {"subscription": 0, "topup": 100, "total": 100}
-    assert [(e["kind"], e["amount"], e["bucket"]) for e in body["entries"]] == [("signup_grant", 100, "topup")]
+    assert body["balance"] == {"subscription": 0, "topup": 200, "total": 200}
+    assert [(e["kind"], e["amount"], e["bucket"]) for e in body["entries"]] == [("signup_grant", 200, "topup")]
     # la réinitialisation vérifie aussi l'adresse : pas de second octroi
     await anon.post("/api/auth/forgot", json={"email": "a@x.com"})
     await anon.post("/api/auth/reset", json={"token": link_token(mailer.outbox[-1], "/reset"), "password": NEW_PASSWORD})
     await session.refresh(user)  # la réinitialisation révoque les sessions : nouveau cookie
-    assert (await _balance(await api_as(user)))["balance"]["total"] == 100
+    assert (await _balance(await api_as(user)))["balance"]["total"] == 200
 
 
 async def test_reset_of_unverified_account_grants_when_it_verifies(api_as, session, mailer):
@@ -40,7 +40,7 @@ async def test_reset_of_unverified_account_grants_when_it_verifies(api_as, sessi
     await anon.post("/api/auth/forgot", json={"email": "a@x.com"})
     await anon.post("/api/auth/reset", json={"token": link_token(mailer.outbox[-1], "/reset"), "password": NEW_PASSWORD})
     await session.refresh(user)
-    assert (await _balance(await api_as(user)))["balance"]["total"] == 100
+    assert (await _balance(await api_as(user)))["balance"]["total"] == 200
 
 
 async def test_unverified_account_has_zero_credits(api_as, make_user, session):

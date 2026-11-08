@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { api, errorMessage } from "../api";
 import { tokenFromSearch } from "../auth";
 import { AuthCard, AuthMessage } from "../components/AuthCard";
+import { t } from "../i18n";
 
 type State = { ok: boolean; message: string } | null;
 
@@ -10,24 +11,24 @@ type State = { ok: boolean; message: string } | null;
  *  renvoie vers la connexion. */
 export default function Verify() {
   const token = tokenFromSearch(useLocation().search);
-  const [state, setState] = useState<State>(token ? null : { ok: false, message: "Lien invalide ou expiré" });
+  const [state, setState] = useState<State>(token ? null : { ok: false, message: t("Lien invalide ou expiré") });
   const sent = useRef(false); // jeton à usage unique : un seul appel, même si l'effet est rejoué (StrictMode)
 
   useEffect(() => {
     if (!token || sent.current) return;
     sent.current = true;
     api("/auth/verify", { method: "POST", body: JSON.stringify({ token }) }).then(
-      () => setState({ ok: true, message: "Adresse e-mail confirmée. Connectez-vous pour continuer." }),
+      () => setState({ ok: true, message: t("Adresse e-mail confirmée. Connectez-vous pour continuer.") }),
       (err) => setState({ ok: false, message: errorMessage(err) }),
     );
   }, [token]);
 
   return (
-    <AuthCard title="Confirmation de l'adresse" links={state ? [{ to: "/login", label: "Se connecter" }] : []}>
+    <AuthCard title={t("Confirmation de l'adresse")} links={state ? [{ to: "/login", label: t("Se connecter") }] : []}>
       {state ? (
         <AuthMessage error={!state.ok}>{state.message}</AuthMessage>
       ) : (
-        <p className="login-message muted">Vérification du lien…</p>
+        <p className="login-message muted">{t("Vérification du lien…")}</p>
       )}
     </AuthCard>
   );

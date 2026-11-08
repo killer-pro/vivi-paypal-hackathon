@@ -1,12 +1,13 @@
-export const usd = new Intl.NumberFormat("fr-FR", {
+import { locale } from "./i18n";
+export const usd = new Intl.NumberFormat(locale, {
   style: "currency",
   currency: "USD",
   currencyDisplay: "narrowSymbol",
   maximumFractionDigits: 3, // les appels IA coûtent souvent moins d'un centime
 });
 
-export const dateTime = new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", timeStyle: "short" });
-export const longDate = new Intl.DateTimeFormat("fr-FR", { dateStyle: "long" });
+export const dateTime = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
+export const longDate = new Intl.DateTimeFormat(locale, { dateStyle: "long" });
 
 /** Durée en `m:ss` (pistes audio). */
 export function clock(seconds: number): string {

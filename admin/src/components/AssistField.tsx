@@ -14,6 +14,7 @@ import {
 import { errorMessage } from "../api";
 import { TuneIcon, WandIcon } from "./icons";
 import TextArea from "./TextArea";
+import { t } from "../i18n";
 
 interface AssistFieldProps {
   label: string;
@@ -49,7 +50,7 @@ export default function AssistField({
   scope,
   locked = false,
   unsaved,
-  instructionPlaceholder = "Consigne pour l'IA (facultative) : plus court, plus punchy, ton humoristique…",
+  instructionPlaceholder = t("Consigne pour l'IA (facultative) : plus court, plus punchy, ton humoristique…"),
   children,
 }: AssistFieldProps) {
   const id = useId();
@@ -75,7 +76,7 @@ export default function AssistField({
     try {
       const result = await requestAssist(assistBody(kind, requested, sent, instruction, context));
       if (replyIsStale(sent, latest.current.value)) {
-        setError("Le champ a changé pendant la demande : proposition ignorée.");
+        setError(t("Le champ a changé pendant la demande : proposition ignorée."));
         return;
       }
       setApplied({ previous: canUndo(sent, applied) ? applied!.previous : sent, result });
@@ -95,7 +96,7 @@ export default function AssistField({
 
   const mode: AssistMode = value.trim() ? "rewrite" : "generate";
   const blocked = assistBlocked(mode, value, locked, loading !== null);
-  const verb = mode === "rewrite" ? "Améliorer" : "Générer";
+  const verb = mode === "rewrite" ? t("Améliorer") : t("Générer");
 
   return (
     <div className={`field assist-field${loading ? " is-assisting" : ""}`} aria-busy={loading !== null}>
@@ -107,8 +108,8 @@ export default function AssistField({
             className="btn btn-small btn-ghost btn-icon"
             onClick={() => setInstructing((v) => !v)}
             aria-expanded={instructing}
-            aria-label={`Consigne pour l'IA : ${name}`}
-            title="Ajouter une consigne"
+            aria-label={t("Consigne pour l'IA : {name}", { name })}
+            title={t("Ajouter une consigne")}
           >
             <TuneIcon />
           </button>
@@ -119,10 +120,10 @@ export default function AssistField({
             onClick={() => ask(mode)}
             aria-disabled={blocked !== null}
             title={blocked && loading === null ? blocked : undefined}
-            aria-label={`${verb} avec l'IA : ${name}`}
+            aria-label={t("{verb} avec l'IA : {name}", { verb, name })}
           >
             {!loading && <WandIcon />}
-            {loading ? (mode === "rewrite" ? "Amélioration…" : "Génération…") : verb}
+            {loading ? (mode === "rewrite" ? t("Amélioration…") : t("Génération…")) : verb}
           </button>
         </div>
       </div>
@@ -133,7 +134,7 @@ export default function AssistField({
           className="input assist-instruction"
           autoFocus
           rows={2}
-          aria-label={`Consigne pour l'IA : ${name} (Ctrl+Entrée pour lancer)`}
+          aria-label={t("Consigne pour l'IA : {name} (Ctrl+Entrée pour lancer)", { name })}
           placeholder={instructionPlaceholder}
           maxLength={MAX_INSTRUCTION}
           value={instruction}
@@ -154,9 +155,9 @@ export default function AssistField({
       )}
       {canUndo(value, applied) && (
         <p className="assist-note" role="status">
-          <span className="muted">Proposition de l'IA, pas encore enregistrée.</span>
-          <button type="button" className="assist-btn" onClick={undo} aria-label={`Annuler la proposition : ${name}`}>
-            Annuler la proposition
+          <span className="muted">{t("Proposition de l'IA, pas encore enregistrée.")}</span>
+          <button type="button" className="assist-btn" onClick={undo} aria-label={t("Annuler la proposition : {name}", { name })}>
+            {t("Annuler la proposition")}
           </button>
         </p>
       )}

@@ -6,7 +6,7 @@ import AssistField from "../components/AssistField";
 import Pills from "../components/Pills";
 import {
   canCreate,
-  DURATIONS,
+  durationOptions,
   fromTemplate,
   MAX_DURATION_S,
   MIN_DURATION_S,
@@ -19,6 +19,7 @@ import "./NewVideo.css";
 import TextArea from "../components/TextArea";
 import { MAX_THEME } from "../limits";
 import { forgetIdea, pendingIdea } from "../pendingIdea";
+import { t } from "../i18n";
 
 /** Idée, style et durée : un seul bouton crée le projet et lance la génération du plan. */
 export default function NewVideo() {
@@ -81,8 +82,8 @@ export default function NewVideo() {
     } catch (err) {
       setError(
         id === null
-          ? `Création impossible. ${errorMessage(err)}`
-          : `Vidéo créée, mais le plan n'a pas pu démarrer. ${errorMessage(err)}`,
+          ? t("Création impossible. {error}", { error: errorMessage(err) })
+          : t("Vidéo créée, mais le plan n'a pas pu démarrer. {error}", { error: errorMessage(err) }),
       );
       setBusy(false);
     }
@@ -97,17 +98,17 @@ export default function NewVideo() {
   return (
     <section className="composer" aria-labelledby="composer-title">
       <header className="composer-head">
-        <h1 id="composer-title">Nouvelle vidéo</h1>
+        <h1 id="composer-title">{t("Nouvelle vidéo")}</h1>
       </header>
       {access && !access.subscribed && (
         <p className="composer-subscribe" role="status">
-          Abonnez-vous pour générer vos vidéos en entier, avec les profils et styles avancés.{" "}
-          <Link to="/credits">Voir les offres</Link>
+          {t("Avec un forfait : vidéos plus longues, profils et styles avancés, plus d'images de référence.")}{" "}
+          <Link to="/plans">{t("Voir les forfaits")}</Link>
         </p>
       )}
       <form className="composer-form" onSubmit={submit}>
-        <div className="templates" role="group" aria-label="Modèles de départ">
-          <h2 className="templates-title">Partir d'un modèle</h2>
+        <div className="templates" role="group" aria-label={t("Modèles de départ")}>
+          <h2 className="templates-title">{t("Partir d'un modèle")}</h2>
           <ul>
             {TEMPLATES.map((t) => (
               <li key={t.id}>
@@ -119,7 +120,7 @@ export default function NewVideo() {
             ))}
           </ul>
         </div>
-        <AssistField label="Votre idée" kind="theme" value={subject} onChange={setSubject} locked={busy}>
+        <AssistField label={t("Votre idée")} kind="theme" value={subject} onChange={setSubject} locked={busy}>
           {(f) => (
             <TextArea
               {...f}
@@ -127,31 +128,31 @@ export default function NewVideo() {
               className="input composer-subject"
               required
               maxLength={MAX_THEME}
-              placeholder="Ex. 3 astuces pour mieux dormir, ton direct, public 18-30 ans"
+              placeholder={t("Ex. 3 astuces pour mieux dormir, ton direct, public 18-30 ans")}
               value={subject}
               onChange={(e) => setSubject(e.target.value)}
             />
           )}
         </AssistField>
         <div className="composer-bar">
-          <Pills legend="Style" name="style" options={styleOptions(styles ?? [], access?.locked.styles, access?.reasons.style ?? "")} value={style} onChange={setStyle} disabled={busy} />
+          <Pills legend={t("Style")} name="style" options={styleOptions(styles ?? [], access?.locked.styles, access?.reasons.style ?? "")} value={style} onChange={setStyle} disabled={busy} />
           <Pills
-            legend="Durée"
+            legend={t("Durée")}
             name="duration"
-            options={DURATIONS.map((d) => ({ value: String(d), label: `${d} s` }))}
+            options={durationOptions(access?.perks.max_duration_s, t("Limite de votre forfait : {n} s", { n: access?.perks.max_duration_s ?? 0 }))}
             value={duration}
             onChange={setDuration}
             disabled={busy}
           />
           <label className="new-duration">
-            <span className="sr-only">Durée en secondes</span>
+            <span className="sr-only">{t("Durée en secondes")}</span>
             <input
               className="input"
               type="number"
               inputMode="numeric"
               min={MIN_DURATION_S}
               max={MAX_DURATION_S}
-              placeholder="Autre durée"
+              placeholder={t("Autre durée")}
               aria-invalid={invalidDuration}
               disabled={busy}
               value={duration}
@@ -160,7 +161,7 @@ export default function NewVideo() {
           </label>
           <div className="composer-actions">
             <button className="btn btn-primary btn-large" disabled={busy || !canCreate(subject, duration)}>
-              {busy ? "Création du plan…" : "Créer le plan"}
+              {busy ? t("Création du plan…") : t("Créer le plan")}
             </button>
           </div>
         </div>
@@ -175,7 +176,7 @@ export default function NewVideo() {
             {created !== null && (
               <>
                 {" "}
-                <Link to={`/projects/${created}/plan`}>Ouvrir le plan</Link>
+                <Link to={`/projects/${created}/plan`}>{t("Ouvrir le plan")}</Link>
               </>
             )}
           </p>

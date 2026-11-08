@@ -13,9 +13,10 @@ from app.models import Step
 from app.providers.registry import ProviderRegistry
 from app.queue import close_connections, enqueue_step, publish_event
 from app.services import credits, langfuse
-from app.services.pipeline import MAX_JOB_TIMEOUT, PipelineContext, run_step
+from app.services.pipeline import PipelineContext, run_step
 from app.services.queue_runs import dispatch_queue, projects_with_queue
 from app.services.steps import advance, start_reference_after_script, stop_autopilot
+from app.services.timeouts import MAX_JOB_TIMEOUT
 from app.storage import get_storage
 
 INTERRUPTED = "job interrompu ou expiré"

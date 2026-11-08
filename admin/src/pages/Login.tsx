@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { api } from "../api";
 import { pendingIdea } from "../pendingIdea";
 import { AuthForm, EmailField, PasswordField } from "../components/AuthCard";
+import { t } from "../i18n";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -11,11 +12,11 @@ export default function Login() {
 
   return (
     <AuthForm
-      title="Se connecter"
-      submitLabel="Se connecter"
+      title={t("Se connecter")}
+      submitLabel={t("Se connecter")}
       links={[
-        { to: "/register", label: "Créer un compte" },
-        { to: "/forgot", label: "Mot de passe oublié" },
+        { to: "/register", label: t("Créer un compte") },
+        { to: "/forgot", label: t("Mot de passe oublié") },
       ]}
       onSubmit={async () => {
         await api("/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });

@@ -6,6 +6,7 @@ import { planLabel, type CustomerList } from "../adminSaas";
 import { formatCredits } from "../credits";
 import { dateTime } from "../format";
 import "./Customers.css";
+import { t } from "../i18n";
 
 const PAGE = 50;
 
@@ -20,12 +21,12 @@ export default function Customers() {
   return (
     <>
       <header className="page-head">
-        <h1>Clients</h1>
+        <h1>{t("Clients")}</h1>
         <input
           className="input customers-search"
           type="search"
-          placeholder="Rechercher une adresse e-mail"
-          aria-label="Rechercher un client"
+          placeholder={t("Rechercher une adresse e-mail")}
+          aria-label={t("Rechercher un client")}
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -34,18 +35,18 @@ export default function Customers() {
         />
       </header>
       {error && <ErrorState message={error} onRetry={reload} />}
-      {!error && !data && <p className="muted">Chargement…</p>}
-      {data && data.customers.length === 0 && <p className="muted">Aucun compte ne correspond.</p>}
+      {!error && !data && <p className="muted">{t("Chargement…")}</p>}
+      {data && data.customers.length === 0 && <p className="muted">{t("Aucun compte ne correspond.")}</p>}
       {data && data.customers.length > 0 && (
         <div className="table-wrap">
           <table className="table customers-table">
             <thead>
               <tr>
-                <th>Compte</th>
-                <th>Offre</th>
-                <th className="num">Solde</th>
-                <th className="num">Consommés</th>
-                <th>Inscrit le</th>
+                <th>{t("Compte")}</th>
+                <th>{t("Offre")}</th>
+                <th className="num">{t("Solde")}</th>
+                <th className="num">{t("Consommés")}</th>
+                <th>{t("Inscrit le")}</th>
               </tr>
             </thead>
             <tbody>
@@ -53,10 +54,10 @@ export default function Customers() {
                 <tr key={c.id}>
                   <td>
                     <Link to={`/clients/${c.id}`}>{c.email}</Link>
-                    {!c.verified && <span className="muted"> · adresse non confirmée</span>}
+                    {!c.verified && <span className="muted">{t(" · adresse non confirmée")}</span>}
                   </td>
                   <td>{planLabel(c)}</td>
-                  <td className="num">{c.role === "admin" ? "Illimité" : formatCredits(c.balance.total)}</td>
+                  <td className="num">{c.role === "admin" ? t("Illimité") : formatCredits(c.balance.total)}</td>
                   <td className="num">{formatCredits(c.spent)}</td>
                   <td className="nowrap muted">{dateTime.format(new Date(c.created_at))}</td>
                 </tr>
@@ -68,13 +69,13 @@ export default function Customers() {
       {data && data.total > PAGE && (
         <div className="customers-pager">
           <button className="btn btn-small" disabled={page === 0} onClick={() => setPage(page - 1)}>
-            Précédents
+            {t("Précédents")}
           </button>
           <span className="muted">
             {page * PAGE + 1}–{Math.min(data.total, (page + 1) * PAGE)} sur {data.total}
           </span>
           <button className="btn btn-small" disabled={(page + 1) * PAGE >= data.total} onClick={() => setPage(page + 1)}>
-            Suivants
+            {t("Suivants")}
           </button>
         </div>
       )}

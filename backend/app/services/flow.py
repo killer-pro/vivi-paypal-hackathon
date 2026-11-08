@@ -147,3 +147,20 @@ async def run_progress(session: AsyncSession, project_id: int, steps: list[Step]
             if done or (include_empty and not step.run_id.startswith(SCENE_RUN_PREFIX)):
                 out[step.name] = {"done": done, "total": len(scene_ids)}
     return out
+
+
+def references_to_make(elements: list[dict], overrides: dict | None) -> list[dict]:
+    """Éléments récurrents générés par un lancement de `reference` : l'élément `reference_id` seul, les éléments
+    `reference_ids` (autopilot limité par le forfait), sinon tous."""
+    overrides = overrides or {}
+    if overrides.get("reference_id"):
+        return [e for e in elements if e["id"] == overrides["reference_id"]]
+    if "reference_ids" in overrides:
+        return [e for e in elements if e["id"] in set(overrides["reference_ids"])]
+    return elements
+
+
+async def reference_elements(session: AsyncSession, project_id: int) -> set[str]:
+    """Éléments qui ont déjà une image de référence (`""` : image du projet, sans élément)."""
+    metas = await session.scalars(select(Asset.meta).where(Asset.project_id == project_id, Asset.kind == "reference"))
+    return {(meta or {}).get("ref", "") for meta in metas}

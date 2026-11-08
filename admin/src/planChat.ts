@@ -1,5 +1,6 @@
 import type { PlanMessage } from "./api";
 import { currentStep, hasResult, type Step } from "./steps";
+import { t } from "./i18n";
 
 /** Étapes du plan : l'idée, l'histoire (beats et éléments) puis les scènes. */
 const PLAN_STEPS: Step["name"][] = ["idea", "story", "script"];
@@ -27,9 +28,9 @@ export type PlanStepState = "done" | "running" | "failed" | "todo";
 
 /** Ce que produit chaque étape du plan, dans l'ordre où elles s'enchaînent. */
 const PLAN_STEP_TEXT: Record<string, { label: string; hint: string }> = {
-  idea: { label: "Idée", hint: "L'angle et l'accroche de la vidéo" },
-  story: { label: "Histoire", hint: "Les beats et les éléments suivis" },
-  script: { label: "Scènes", hint: "La voix off et le visuel de chaque scène" },
+  idea: { label: t("Idée"), hint: t("L'angle et l'accroche de la vidéo") },
+  story: { label: t("Histoire"), hint: t("Les beats et les éléments suivis") },
+  script: { label: t("Scènes"), hint: t("La voix off et le visuel de chaque scène") },
 };
 
 /** Avancement de la génération du plan (écrans d'attente, d'échec et de départ) : une ligne par étape avec son état ;
@@ -65,14 +66,14 @@ export function planLocks(
   return {
     locked: busy || running.some((name) => name !== "reference"),
     running: running.length > 0,
-    saveBlocked: running.includes("reference") ? "Les images du casting se génèrent : enregistrement possible à leur fin" : null,
+    saveBlocked: running.includes("reference") ? t("Les images du casting se génèrent : enregistrement possible à leur fin") : null,
   };
 }
 
 /** Raison pour laquelle on ne peut pas parler à l'IA maintenant (le serveur refuse aussi : 409), sinon `null`. */
 export function chatBlockedReason({ dirty, running }: { dirty: boolean; running: boolean }): string | null {
-  if (dirty) return "Enregistrez ou annulez vos modifications avant de parler à l'IA";
-  if (running) return "Une génération est en cours : attendez sa fin ou arrêtez-la pour parler à l'IA";
+  if (dirty) return t("Enregistrez ou annulez vos modifications avant de parler à l'IA");
+  if (running) return t("Une génération est en cours : attendez sa fin ou arrêtez-la pour parler à l'IA");
   return null;
 }
 

@@ -1,5 +1,57 @@
 # Changelog
 
+## 2026-11-08 (dépôt public, mise à jour)
+- Dépôt public mis à jour depuis le dépôt principal : forfaits Starter / Créateur / Pro en abonnements PayPal (un plan par forfait), crédits recalés, page « Forfaits », interface français / anglais, providers Groq et Comfy Cloud, compose de production (`deploy/`). Licence MIT ajoutée (`LICENSE`), README hackathon mis à jour.
+
+## 2026-11-08 (forfaits en ligne)
+- Déployé sur le serveur de démo (migration `0020`) ; trois plans PayPal sandbox créés, un par forfait ; vérifié en ligne avec le compte démo : forfaits payables par PayPal, prix en crédits, motifs neutres, `/costs` refusé, Comfy Cloud en tête. Doc : `deploiement.md`.
+
+## 2026-11-07 (forfaits)
+- Forfaits Starter, Créateur et Pro et niveau Gratuit dans `billing_config` (`tiers`, `free`, `packs`), chacun avec ses avantages (file, références, profils, durée, clips en parallèle, styles) ; ils remplacent `subscription_locked`. Colonne `users.plan_id` (migration `0020`) ; un abonné sans forfait connu a les avantages du Starter ; l'ancien format du réglage retombe sur les défauts. Motifs « Réservé au forfait Créateur : … » et « Limite de votre forfait : … » ; images de référence ouvertes à tous. `GET /api/access` expose le forfait et ses avantages ; `set_subscription.py --plan`. Doc : `abonnement.md`.
+- Limites des forfaits appliquées : file d'attente par projet (remplace `MAX_QUEUED = 5`), nombre d'éléments de référence (import, lancement ; l'autopilot génère les premiers éléments permis), durée d'un projet, clips en parallèle (remplace le réglage `credits_max_parallel_clips`). Doc : `abonnement.md`, `file-attente.md`, `credits.md`.
+- Abonnement par forfait : `POST /api/billing/paypal/subscription {tier_id}` et `checkout {kind: "subscription", tier_id}` ; le forfait est retrouvé par le plan PayPal (ou les métadonnées de l'abonnement Stripe) et fixe `users.plan_id` et le quota mensuel. `GET /api/billing` liste les forfaits (`tiers`, avantages, `current_tier`). `paypal_create_plan.py --tier <id>` crée un plan par forfait. Doc : `paiement.md`.
+- Prix recalés sur les coûts mesurés : crédit à 0,01 $, marge ×3, 200 crédits d'inscription ; `flat_usd` de Groq, Comfy Cloud et ElevenLabs ; clips Comfy Cloud au temps de GPU mesuré (`cloud_clip_usd`, Kontext compris, aussi en mode factice) ; packs 500 crédits / 6 $ et 1 500 / 15 $. Une vidéo de 30 s en Rapide coûte 128 crédits (`video_credits`) ; `GET /api/billing` donne `videos_30s` par forfait. Doc : `credits.md`.
+- Aucun dollar devant un client : cartes de modèles en crédits (`credits_per_clip`), projets en crédits utilisés (`credits_spent`), estimation des clips d'après la carte, `GET /api/costs` et l'écran Coûts réservés à l'admin. Les fichiers d'un projet ne portent plus leur coût en dollars (`meta.cost_usd`) pour un client. Un choix de modèle indisponible bascule sur la carte recommandée ou la première disponible, payante comprise. Doc : `credits.md`, `settings-providers.md`.
+- Cartes indisponibles : motif neutre « Indisponible pour le moment » pour un client (`/api/providers/models`), motif technique pour l'admin. Doc : `settings-providers.md`.
+- Admin : fournisseurs disponibles d'abord (groupes de cartes, cartes, listes d'images) ; motif neutre affiché tel quel ; libellé Gemini de l'image de départ sans montant en dollars. Doc : `profils-generation.md`.
+- Page Forfaits (`/plans`) : trois cartes côte à côte avec crédits, vidéos de 30 s et avantages, rappel du niveau gratuit, recharges ; retours de paiement sur `/plans`. Motifs verrouillés suivis de « Voir les forfaits » ; limites d'images de référence, de durée et de file appliquées dans l'interface. Doc : `abonnement.md`, `paiement.md`.
+- Relecture finale : renouvellements PayPal des abonnés de l'ancien plan unique crédités (forfait du compte ou Starter) ; durée maximale vérifiée aussi au lancement des clips et de la voix ; identifiant de forfait limité à 20 caractères ; estimation en crédits marquée « ≈ ». Doc : `abonnement.md`, `paiement.md`.
+
+## 2026-11-07 (provider Comfy Cloud)
+- Nouveau provider `comfycloud` (`providers/comfycloud.py`) : les profils et graphes ComfyUI exécutés sur les GPU de Comfy Cloud (chargeurs GGUF remplacés par les modèles fp8 du cloud, `cloud_workflow`), pour les clips, l'image de départ (Kontext) et l'image de référence (Flux dev). Coût réel = temps de GPU facturé. Un compte sans abonnement reçoit un message clair (abonnement payant requis). Réglage `comfy_cloud_api_key`, carte Comfy Cloud dans Fournisseurs, cartes de profils avec leur coût par clip. Testé sur le vrai service : clip Rapide de 3 s en 36 s, 0,02 $. Doc : `providers.md`, `settings-providers.md`.
+- Serveur de démo : clips et images de référence sur Comfy Cloud ; DNS des conteneurs passé à 1.1.1.1 / 8.8.8.8 (un résolveur Contabo muet faisait échouer Groq au hasard). Doc : `deploiement.md`.
+
+## 2026-11-07 (déploiement sur le VPS)
+- Compose de production `deploy/` : Caddy (HTTPS, admin compilé par `admin/Dockerfile`, `/api` vers l'API, `s3.<domaine>` vers MinIO pour les URLs présignées), migrations avant API et worker, aucun port publié hors Caddy. MinIO depuis l'image Chainguard (`minio/minio` retirée de Docker Hub). `alembic.ini` : `prepend_sys_path = .` (migrations hors installation éditable). Vivi tourne sur https://45-13-235-135.sslip.io. Doc : `deploiement.md`.
+- Données locales copiées sur le serveur (base et 1 035 fichiers) ; six projets vedettes dupliqués sur `demo@example.com` pour le jury.
+
+## 2026-11-07 (provider de texte Groq)
+- Nouveau provider `groq` (`providers/groq.py`) pour les idées, scripts et métadonnées, hébergé : remplace Ollama sur le serveur de démo sans GPU. Modèle par défaut `openai/gpt-oss-120b` (testé sur les six schémas du pipeline, ~1 s, moins de 0,001 $ par appel). Réglages `groq_api_key`, `groq_model`, `llm_provider=groq` ; carte Groq dans Fournisseurs. La conversion de schéma Gemini → JSON Schema devient `standard_schema` (`providers/base.py`), partagée avec Ollama, et traduit aussi `nullable`. Doc : `providers.md`, `settings-providers.md`.
+
+## 2026-11-07 (graphe de test Comfy Cloud)
+- Ajout de `backend/workflows/comfy-cloud-test-wan22-fast.json` : graphe du profil Rapide (Wan 2.2 14B, clip de 3 s) adapté à Comfy Cloud (`UNETLoader` + modèles fp8 au lieu de `UnetLoaderGGUF`, absent du cloud), ainsi que `comfy-cloud-test-wan22-720p-5s.json` (même graphe en 720×1280 natif, 5 s), à glisser dans l'éditeur de cloud.comfy.org pour mesurer durée et crédits par clip. L'API Comfy Cloud est refusée aux comptes gratuits (403 `FREE_TIER_NOT_ALLOWED`) ; le futur provider Comfy Cloud sera un provider à part. Non lu par le code.
+
+## 2026-11-06 (illustrations du carrousel de /decouvrir)
+- Les huit images d'étape du carrousel (« De l'idée à l'export ») sont remplacées par des illustrations cohérentes qui montrent ce que chaque étape produit (même film publicitaire d'une étape à l'autre) ; l'ancienne série était générique. Doc : `landing.md`.
+
+## 2026-11-05 (langue de l'interface : français / anglais)
+- Admin : bascule FR | EN (barre latérale, `/decouvrir`, écrans de compte), `?lang=en` pour ouvrir une page en anglais. `i18n.ts` (`t`, `tn`, `lang`, `locale`) : la clé est le texte français, le dictionnaire anglais est `locales/en.ts` ; tous les `Intl` suivent la langue. Tous les écrans, panneaux, libellés calculés (`steps`, `studio`, `billing`, `credits`, `models`, `templates`, `landing`…) passent par `t`. Libellés du mode auto-hébergé reformulés en anglais (sans « local » ni « gratuit »).
+- Test `i18n.test.ts` : langue (adresse, mémoire, repli), interpolation, pluriel, et chaque `t("…")` du code a sa traduction avec les mêmes variables. Doc : `langue.md`.
+
+## 2026-11-05 (abonnement PayPal, lot 3)
+- Backend : abonnement mensuel par PayPal Subscriptions. `PayPalClient` : `create_subscription`, `get_subscription`, `cancel_subscription`, `create_monthly_plan` ; `FakePayPal.approve_subscription` pour les tests. `payments.apply_paypal_subscription` / `handle_paypal_event` (un cycle payé = un crédit de quota, idempotent par `paypal:sub:<id>:<mois>`, état relu chez PayPal) ; webhook étendu à `PAYMENT.SALE.COMPLETED` et `BILLING.SUBSCRIPTION.*`. Routes `/billing/paypal/subscription[/confirm|/cancel]`, `GET /billing` expose `paypal_cancellable`. `billing_config.subscription.paypal_plan_id`, migration `0019` (`users.paypal_subscription_id`), script `scripts/paypal_create_plan.py`. Motif d'identifiant PayPal partagé (`PAYPAL_ID`, `_safe_id`).
+- Admin : boutons « S'abonner avec PayPal » et « Annuler mon abonnement PayPal », confirmation au retour (`paypal_sub=success`) ; `useConfirmOnce` factorise la confirmation unique des retours PayPal.
+- Vérifié dans le bac à sable PayPal : abonnement de 19 $ approuvé, 400 crédits une seule fois, annulation. Doc : `paiement.md`, `soumission-paypal.md`.
+
+## 2026-11-05 (revue DRY)
+- Backend : `AppSettings.set_many` valide chaque réglage par une table (`CHOICES`, `PATTERNS`, `RULES` + `_validation_error`) au lieu d'une chaîne de `if` ; mêmes règles, mêmes messages. `ProviderError` documentée comme l'« échec attendu à message lisible » (aussi levée par ffmpeg et la lecture des réponses LLM) : pas de renommage.
+- Backend : `services/pipeline.py` (966 lignes) découpé par responsabilité : `prompts.py` (textes LLM, `VISUAL_PROMPT_GUIDE`), `script_parsing.py` (lecture et contrôle des réponses), `timeouts.py` (`step_timeout`, `job_timeout`), `choices.py` (provider et modèle d'un lancement). `pipeline.py` garde le contexte, les exécuteurs et `run_step`. `STORY_SYSTEM` (identique à `SCRIPT_SYSTEM`) supprimé. Aucun changement de comportement.
+- Test `test_chaque_etape_a_un_executeur` : `EXECUTORS` doit couvrir exactement `STEP_NAMES` (une étape sans exécuteur ou une clé mal orthographiée est détectée par la CI).
+- Admin : `useProject` envoie les fichiers (clip, référence) par `act`, comme les autres actions (garde `inFlight`, `busy`, erreur et rechargement écrits une seule fois) ; `formOf` construit le `FormData`.
+
+## 2026-11-04 (revue de l'image de référence ComfyUI)
+- `reference` : timeout par appel de 1800 s avec ComfyUI (`IMAGE_TIMEOUT_S`) et timeout du job calculé sur le nombre d'éléments récurrents ; erreurs de connexion converties en « ComfyUI injoignable » ; Flux gardé en mémoire entre deux images (`still` / `release`) ; `keyframe_workflow` sans profil inutilisé ; docs et tests (`ComfyUIImage`) complétés. Modèle d'image par défaut de chaque provider défini en un seul endroit (`image_model_ids`), docstring de `flux_files` précisée, test du catalogue indépendant de l'ordre.
+
 ## 2026-11-03 (dépôt public)
 - Webhook PayPal essayé de bout en bout par un tunnel Cloudflare (événement signé livré, crédit unique) ; procédure dans `paiement.md`.
 - Dépôt public `vivi-paypal-hackathon` (sans docs de stratégie ni historique). Essai d'un clone neuf : vidéo complète en mode factice. Corrigés : identifiants PayPal saisis prioritaires sur le faux (faux partagé entre requêtes), voix par défaut en mode factice. Dépôt public seulement : RustFS remplace MinIO (retiré de Docker Hub), Redis ajouté à la CI.

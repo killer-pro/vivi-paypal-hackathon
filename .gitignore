@@ -10,3 +10,4 @@ dist/
 .playwright-mcp/
 .DS_Store
 .worktrees/
+graphify-out/

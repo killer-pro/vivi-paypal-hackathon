@@ -5,6 +5,7 @@ import AssistField from "../AssistField";
 import StepPanel, { type PanelProps } from "../StepPanel";
 import { FormActions } from "../ui";
 import TextArea from "../TextArea";
+import { t } from "../../i18n";
 
 export default function FinalPanel(props: PanelProps) {
   const { flow, project, step, locked } = props;
@@ -37,15 +38,15 @@ export default function FinalPanel(props: PanelProps) {
   return (
     <StepPanel
       {...props}
-      runLabel={hasResult(step) ? "Régénérer les métadonnées" : "Générer les métadonnées"}
-      approveLabel="Valider le projet"
+      runLabel={hasResult(step) ? t("Régénérer les métadonnées") : t("Générer les métadonnées")}
+      approveLabel={t("Valider le projet")}
     >
       {hasResult(step) ? (
         <form className="form" onSubmit={save}>
-          <AssistField label="Titre de publication" kind="title" {...field("title")}>
+          <AssistField label={t("Titre de publication")} kind="title" {...field("title")}>
             {(f) => <input {...f} className="input" value={meta.value.title} onChange={change("title")} />}
           </AssistField>
-          <AssistField label="Description" kind="description" {...field("description")}>
+          <AssistField label={t("Description")} kind="description" {...field("description")}>
             {(f) => (
               <TextArea
                 {...f}
@@ -55,10 +56,10 @@ export default function FinalPanel(props: PanelProps) {
               />
             )}
           </AssistField>
-          <AssistField label="Hashtags (séparés par des espaces)" kind="hashtags" {...field("hashtags")}>
+          <AssistField label={t("Hashtags (séparés par des espaces)")} kind="hashtags" {...field("hashtags")}>
             {(f) => <input {...f} className="input" value={meta.value.hashtags} onChange={change("hashtags")} />}
           </AssistField>
-          {meta.dirty && <FormActions submitLabel="Enregistrer" onCancel={meta.reset} disabled={locked} />}
+          {meta.dirty && <FormActions submitLabel={t("Enregistrer")} onCancel={meta.reset} disabled={locked} />}
         </form>
       ) : null}
     </StepPanel>

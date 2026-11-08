@@ -1,10 +1,41 @@
 import { useEffect, useRef, useState } from "react";
 import { api, errorMessage, useApi } from "../api";
-import { checkoutNotice, offerCaption, paypalNotice, paypalReturn, subscriptionStatus, type Billing } from "../billing";
+import {
+  checkoutNotice,
+  offerCaption,
+  paypalNotice,
+  paypalReturn,
+  paypalSubscriptionNotice,
+  paypalSubscriptionReturn,
+  subscriptionStatus,
+  type Billing,
+  type SubscriptionConfirmation,
+} from "../billing";
+import { formatCredits } from "../credits";
+import { perkLines, tierState } from "../plans";
+import { serverText } from "../serverText";
+import { CheckIcon } from "./icons";
 import "./BillingOffers.css";
+import { t, tn } from "../i18n";
 
-/** Abonnement et recharges de la page Crédits : un clic ouvre la page de paiement Stripe ou PayPal ; les crédits
- *  n'arrivent qu'au webhook Stripe, ou à la capture PayPal faite au retour (le solde se recharge ensuite). */
+const STRIP_MAX = 30;
+
+const SUBSCRIPTION_CANCELLED = t("Abonnement PayPal annulé : la période déjà payée reste acquise.");
+
+/** Une seule confirmation par retour de PayPal (commande ou abonnement), même si l'effet est rejoué (mode strict de
+ *  React, rechargement des données). */
+function useConfirmOnce(id: string | null, run: (id: string) => void) {
+  const done = useRef<string | null>(null);
+  useEffect(() => {
+    if (!id || done.current === id) return;
+    done.current = id;
+    run(id);
+  }, [id, run]);
+}
+
+/** Forfaits et recharges de la page Forfaits : un clic ouvre la page de paiement Stripe ou PayPal ; les crédits
+ *  n'arrivent qu'au webhook Stripe, ou à la capture (recharge) ou confirmation (abonnement) PayPal faite au retour sur
+ *  `/plans` (le solde se recharge ensuite). */
 export default function BillingOffers({ onPaid }: { onPaid: () => void }) {
   const { data: billing, error, reload } = useApi<Billing>("/billing");
   const [busy, setBusy] = useState(false);
@@ -14,22 +45,35 @@ export default function BillingOffers({ onPaid }: { onPaid: () => void }) {
   const returned = paypalReturn(window.location.search);
   const orderId = returned?.status === "success" ? returned.orderId : null;
   const [credited, setCredited] = useState<number | null>(null);
-
-  const captured = useRef<string | null>(null);
+  const returnedSub = paypalSubscriptionReturn(window.location.search);
+  const subscriptionId = returnedSub?.status === "success" ? returnedSub.subscriptionId : null;
+  const [confirmation, setConfirmation] = useState<SubscriptionConfirmation | null>(null);
+  const [cancelledSub, setCancelledSub] = useState(false);
 
   // Retour de PayPal : la commande approuvée se capture ici (et le webhook sert de filet si l'onglet se ferme avant).
-  // Une seule capture par commande, même si l'effet est rejoué (mode strict de React, rechargement des données).
-  useEffect(() => {
-    if (!orderId || captured.current === orderId) return;
-    captured.current = orderId;
-    api<{ credited: number }>("/billing/paypal/capture", { method: "POST", body: JSON.stringify({ order_id: orderId }) })
+  useConfirmOnce(orderId, (id) =>
+    api<{ credited: number }>("/billing/paypal/capture", { method: "POST", body: JSON.stringify({ order_id: id }) })
       .then((r) => {
         setCredited((before) => Math.max(before ?? 0, r.credited));
         onPaid();
         reload();
       })
-      .catch((err) => setFailure(errorMessage(err)));
-  }, [orderId, onPaid, reload]);
+      .catch((err) => setFailure(errorMessage(err))),
+  );
+
+  // Retour de PayPal après l'abonnement : le premier mois prélevé crédite le quota (le webhook sert de filet).
+  useConfirmOnce(subscriptionId, (id) =>
+    api<SubscriptionConfirmation>("/billing/paypal/subscription/confirm", {
+      method: "POST",
+      body: JSON.stringify({ subscription_id: id }),
+    })
+      .then((r) => {
+        setConfirmation(r);
+        onPaid();
+        reload();
+      })
+      .catch((err) => setFailure(errorMessage(err))),
+  );
 
   // Retour de paiement : le webhook peut arriver après la redirection, le solde est relu quelques fois.
   useEffect(() => {
@@ -55,66 +99,143 @@ export default function BillingOffers({ onPaid }: { onPaid: () => void }) {
     }
   }
 
+  async function cancelSubscription() {
+    setBusy(true);
+    setFailure(null);
+    try {
+      await api("/billing/paypal/subscription/cancel", { method: "POST" });
+      setCancelledSub(true);
+      reload();
+    } catch (err) {
+      setFailure(errorMessage(err));
+    }
+    setBusy(false);
+  }
+
   if (error) return <p className="error">{error}</p>;
   if (!billing) return null;
-  const { subscription, packs } = billing;
-  const message = returned ? paypalNotice(returned, credited) : notice;
+  const message = cancelledSub
+    ? SUBSCRIPTION_CANCELLED
+    : returnedSub
+      ? paypalSubscriptionNotice(returnedSub, confirmation)
+      : returned
+        ? paypalNotice(returned, credited)
+        : notice;
   return (
-    <section className="billing" aria-label="Abonnement et recharges">
-      <div className="billing-head">
-        <h2>Abonnement et recharges</h2>
-        <span className="muted">{subscriptionStatus(billing)}</span>
+    <>
+      <p className="plans-status muted">
+        {subscriptionStatus(billing)}
         {billing.manageable && (
           <button className="btn btn-small btn-ghost" disabled={busy} onClick={() => go("/billing/portal")}>
-            Gérer mes achats et mes factures
+            {t("Gérer mes achats et mes factures")}
           </button>
         )}
-      </div>
+      </p>
       {message && (
         <p className="notice" role="status">
           {message}
         </p>
       )}
-      <div className="billing-offers">
-        <div className="offer offer-main">
-          <strong>Abonnement mensuel</strong>
-          <span className="muted">{offerCaption(subscription)} · profils Précision et Maximum, images de référence, styles</span>
-          <button
-            className="btn btn-primary"
-            disabled={busy || billing.subscribed || !subscription.purchasable}
-            onClick={() => go("/billing/checkout", { kind: "subscription" })}
-          >
-            {billing.subscribed ? "Déjà abonné" : subscription.purchasable ? "S'abonner" : "Bientôt disponible"}
-          </button>
-        </div>
-        {packs.map((pack) => (
-          <div key={pack.id} className="offer">
-            <strong>{offerCaption(pack)}</strong>
-            <span className="muted">N'expirent jamais</span>
-            <button
-              className="btn"
-              disabled={busy || !pack.purchasable}
-              onClick={() => go("/billing/checkout", { kind: "topup", pack_id: pack.id })}
-            >
-              {pack.purchasable ? "Recharger" : pack.paypal_purchasable ? "Recharger par carte" : "Bientôt disponible"}
-            </button>
-            {pack.paypal_purchasable && (
-              <button
-                className="btn btn-ghost"
-                disabled={busy}
-                onClick={() => go("/billing/paypal/order", { pack_id: pack.id })}
-              >
-                Payer avec PayPal
-              </button>
-            )}
-          </div>
-        ))}
-      </div>
       {failure && (
         <p className="error" role="alert">
           {failure}
         </p>
       )}
-    </section>
+
+      <section className="plans-tiers" aria-label={t("Forfaits mensuels")}>
+        {billing.tiers.map((tier) => {
+          const current = tierState(tier, billing.current_tier) === "current";
+          return (
+            <article key={tier.id} className={`plan-card${current ? " is-current" : ""}`} aria-current={current || undefined}>
+              <header className="plan-card-head">
+                <h2>{t(tier.name)}</h2>
+                {current && <span className="plan-card-badge">{t("Votre forfait")}</span>}
+              </header>
+              <p className="plan-card-price">{serverText(tier.label)}</p>
+              <p className="muted">{t("{credits} par mois", { credits: formatCredits(tier.credits) })}</p>
+              <VideoStrip count={tier.videos_30s} />
+              <ul className="plan-perks">
+                {perkLines(tier.perks).map((line) => (
+                  <li key={line}>
+                    <CheckIcon /> {line}
+                  </li>
+                ))}
+              </ul>
+              <div className="plan-card-actions">
+                {current ? (
+                  billing.paypal_cancellable ? (
+                    <button className="btn btn-ghost" disabled={busy} onClick={cancelSubscription}>
+                      {t("Annuler mon abonnement PayPal")}
+                    </button>
+                  ) : (
+                    <span className="muted">{t("Forfait actuel")}</span>
+                  )
+                ) : billing.subscribed ? (
+                  <span className="muted">{t("Pour changer, annulez votre forfait : le nouveau commence à la fin de la période.")}</span>
+                ) : tier.paypal_purchasable ? (
+                  <button className="btn" disabled={busy} onClick={() => go("/billing/paypal/subscription", { tier_id: tier.id })}>
+                    {t("S'abonner avec PayPal")}
+                  </button>
+                ) : (
+                  <button
+                    className="btn"
+                    disabled={busy || !tier.purchasable}
+                    onClick={() => go("/billing/checkout", { kind: "subscription", tier_id: tier.id })}
+                  >
+                    {tier.purchasable ? t("S'abonner par carte") : t("Bientôt disponible")}
+                  </button>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </section>
+
+      <p className="plans-free">
+        <strong>{t("Sans abonnement")}</strong>{" "}
+        <span className="muted">{perkLines(billing.free.perks).join(" ; ")}.</span>
+      </p>
+
+      <section className="plans-packs" aria-labelledby="packs-title">
+        <h2 id="packs-title">{t("Recharges")}</h2>
+        <p className="muted">{t("Crédits sans abonnement, qui n'expirent jamais : avantages du niveau gratuit.")}</p>
+        <div className="billing-offers">
+          {billing.packs.map((pack) => (
+            <div key={pack.id} className="offer">
+              <strong>{offerCaption(pack)}</strong>
+              {pack.paypal_purchasable ? (
+                <button className="btn" disabled={busy} onClick={() => go("/billing/paypal/order", { pack_id: pack.id })}>
+                  {t("Payer avec PayPal")}
+                </button>
+              ) : (
+                <button
+                  className="btn"
+                  disabled={busy || !pack.purchasable}
+                  onClick={() => go("/billing/checkout", { kind: "topup", pack_id: pack.id })}
+                >
+                  {pack.purchasable ? t("Recharger par carte") : t("Bientôt disponible")}
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+/** Ce que paient les crédits du mois, en cadres 9:16 : un par vidéo de 30 s (30 au plus, le reste en nombre). */
+function VideoStrip({ count }: { count: number }) {
+  const shown = Math.min(count, STRIP_MAX);
+  return (
+    <div className="plan-strip">
+      <span className="plan-strip-frames" aria-hidden="true">
+        {Array.from({ length: shown }, (_, i) => (
+          <span key={i} />
+        ))}
+        {count > shown && <span className="plan-strip-more">+{count - shown}</span>}
+      </span>
+      <span>{tn(count, "≈ {n} vidéo de 30 s", "≈ {n} vidéos de 30 s")}</span>
+    </div>
   );
 }

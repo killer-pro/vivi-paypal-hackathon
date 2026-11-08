@@ -458,7 +458,7 @@ async def test_legacy_workflow_param_still_runs(api, session):
 
 
 async def test_run_sizes_job_timeout_from_scene_count(api, session):
-    from app.services.pipeline import job_timeout
+    from app.services.timeouts import job_timeout
 
     pid = await new_project(api)
     await set_status(session, ["idea", "story", "script"], "approved")
@@ -495,7 +495,7 @@ async def test_a_chained_scene_cannot_be_regenerated_before_the_previous_one_has
 
 async def test_run_sizes_clips_timeout_for_local_comfyui(api, session):
     from app.app_settings import AppSettings
-    from app.services.pipeline import job_timeout
+    from app.services.timeouts import job_timeout
 
     pid = await new_project(api)
     await set_status(session, ["idea", "story", "script"], "approved")

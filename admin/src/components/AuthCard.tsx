@@ -3,8 +3,10 @@ import { Link } from "react-router-dom";
 import { errorMessage } from "../api";
 import { PASSWORD_MAX, PASSWORD_MIN } from "../auth";
 import ClipWall from "./ClipWall";
+import LangSwitch from "./LangSwitch";
 import { Field } from "./ui";
 import "../pages/Login.css";
+import { t } from "../i18n";
 
 /** Lien de bas de carte vers un autre écran de compte. */
 export type AuthLink = { to: string; label: string };
@@ -30,6 +32,9 @@ export function AuthCard({
           <span className="brand-mark" aria-hidden />
           <span className="login-brand">Vivi</span>
         </Link>
+        <div className="login-lang">
+          <LangSwitch />
+        </div>
         <h1 className="login-title">{title}</h1>
         {intro && <p className="login-intro">{intro}</p>}
         {children}
@@ -118,7 +123,7 @@ export function AuthForm({
 
 export function EmailField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
-    <Field label="Adresse e-mail">
+    <Field label={t("Adresse e-mail")}>
       <input
         className="input"
         type="email"
@@ -145,7 +150,7 @@ export function PasswordField({
   autoFocus?: boolean;
 }) {
   return (
-    <Field label={create ? `Mot de passe (${PASSWORD_MIN} caractères minimum)` : "Mot de passe"}>
+    <Field label={create ? t("Mot de passe ({n} caractères minimum)", { n: PASSWORD_MIN }) : t("Mot de passe")}>
       <input
         className="input"
         type="password"

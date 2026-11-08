@@ -4,13 +4,13 @@ from typing import Literal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import current_user
 from app.app_settings import AppSettings
 from app.db import get_session
-from app.models import Asset, AssetOriginal, Project, ProviderCall, Scene, Step, User
+from app.models import Asset, AssetOriginal, CreditReservation, Project, ProviderCall, Scene, Step, User
 from app.providers.registry import ProviderRegistry
 from app.services import access
 from app.services.budget import estimate_clips_usd, spent_by_step
@@ -19,6 +19,7 @@ from app.services.flow import (
     ensure_not_running,
     load_steps,
     mark_stale,
+    reference_elements,
     run_progress,
     sync_status,
     target_scene,
@@ -43,9 +44,13 @@ def fields(obj, names: tuple[str, ...]) -> dict:
     return {n: getattr(obj, n) for n in names}
 
 
-def asset_out(asset: Asset, storage, original_name: str | None = None) -> dict:
-    """Asset renvoyé au client : URL présignée et, pour un fichier importé, son nom d'origine (affiché seulement)."""
-    return {**fields(asset, ASSET_FIELDS), "url": storage.presign(asset.key), "original_name": original_name}
+def asset_out(asset: Asset, storage, original_name: str | None = None, *, admin: bool = False) -> dict:
+    """Asset renvoyé au navigateur : URL présignée et, pour un fichier importé, son nom d'origine (affiché seulement).
+    Le coût de génération en dollars (`meta.cost_usd`) n'est gardé que pour l'admin."""
+    out = {**fields(asset, ASSET_FIELDS), "url": storage.presign(asset.key), "original_name": original_name}
+    if not admin:
+        out["meta"] = {k: v for k, v in (asset.meta or {}).items() if k != "cost_usd"}
+    return out
 
 
 async def get_registry(session: AsyncSession = Depends(get_session)) -> AsyncIterator[ProviderRegistry]:
@@ -87,6 +92,23 @@ async def costs(session: AsyncSession, project_ids: list[int]) -> dict[int, floa
     return {pid: round(total, 4) for pid, total in rows.all() if pid is not None}
 
 
+async def credits_spent(session: AsyncSession, project_ids: list[int]) -> dict[int, int]:
+    """Crédits pris par projet : utilisés des réservations fermées, montant retenu des réservations ouvertes."""
+    held = case((CreditReservation.status == "open", CreditReservation.amount), else_=func.coalesce(CreditReservation.used, 0))
+    rows = await session.execute(select(CreditReservation.project_id, func.sum(held))
+                                 .where(CreditReservation.project_id.in_(project_ids)).group_by(CreditReservation.project_id))
+    return {pid: int(total) for pid, total in rows.all() if pid is not None}
+
+
+async def spending(session: AsyncSession, viewer: User, project_ids: list[int]) -> dict[int, dict]:
+    """Dépense de chaque projet : en dollars pour l'admin, en crédits pour un client (jamais de dollars devant lui)."""
+    if viewer.is_admin:
+        cost = await costs(session, project_ids)
+        return {pid: {"cost_usd": cost.get(pid, 0.0), "credits_spent": None} for pid in project_ids}
+    spent = await credits_spent(session, project_ids)
+    return {pid: {"cost_usd": None, "credits_spent": spent.get(pid, 0)} for pid in project_ids}
+
+
 async def latest_renders(session: AsyncSession, project_ids: list[int]) -> dict[int, tuple[int, str]]:
     """(id, clé) du dernier rendu de chaque projet qui en a un."""
     rows = await session.execute(select(Asset.project_id, Asset.id, Asset.key).where(
@@ -106,11 +128,10 @@ async def thumbnail_keys(session: AsyncSession, renders: dict[int, tuple[int, st
     return keys
 
 
-def summary(project: Project, steps: list[Step], cost: dict[int, float]) -> dict:
+def summary(project: Project, steps: list[Step], money: dict) -> dict:
     current = current_step(steps)
     return {**fields(project, ("id", "title", "status", "autopilot", "created_at")),
-            "current_step": current and current.name, "current_status": current and current.status,
-            "cost_usd": cost.get(project.id, 0.0)}
+            "current_step": current and current.name, "current_status": current and current.status, **money}
 
 
 MAX_TARGET_DURATION_S = 180  # une vidéo virale verticale ; au-delà, le découpage et les appels payants s'emballent
@@ -181,9 +202,10 @@ async def list_projects(
         query = query.order_by(Project.created_at.desc(), Project.id.desc())
     projects = (await session.scalars(query.limit(limit).offset(offset))).all()
     ids = [p.id for p in projects]
-    steps, cost, renders = await load_steps(session, ids), await costs(session, ids), await latest_renders(session, ids)
+    steps, money = await load_steps(session, ids), await spending(session, user, ids)
+    renders = await latest_renders(session, ids)
     thumbs = await thumbnail_keys(session, renders, ids)
-    items = [{**summary(p, [s for s in steps if s.project_id == p.id], cost),
+    items = [{**summary(p, [s for s in steps if s.project_id == p.id], money[p.id]),
               "thumbnail_url": storage.presign(thumbs[p.id]) if p.id in thumbs else None,
               "render_asset_id": renders[p.id][0] if p.id in renders else None} for p in projects]
     return {"items": items, "total": total}
@@ -192,7 +214,9 @@ async def list_projects(
 @router.post("", status_code=201)
 async def create_project(body: ProjectIn, user: User = Depends(current_user),
                          session: AsyncSession = Depends(get_session)) -> dict:
-    await access.require(AppSettings(session), user, "style", body.style)
+    app_settings = AppSettings(session)
+    await access.require(app_settings, user, "style", body.style)
+    await access.require_limit(app_settings, user, "max_duration_s", body.target_duration_s)
     project = Project(**body.model_dump(), user_id=user.id)
     session.add(project)
     await session.flush()
@@ -203,7 +227,7 @@ async def create_project(body: ProjectIn, user: User = Depends(current_user),
 
 
 @router.get("/{project_id}")
-async def get_project(project_id: int, session: AsyncSession = Depends(get_session),
+async def get_project(project_id: int, user: User = Depends(current_user), session: AsyncSession = Depends(get_session),
                       storage=Depends(get_storage)) -> dict:
     project = await project_or_404(session, project_id)
     steps = await load_steps(session, [project_id])
@@ -214,10 +238,10 @@ async def get_project(project_id: int, session: AsyncSession = Depends(get_sessi
     resume = await run_progress(session, project_id, steps, "failed")
     progress = await run_progress(session, project_id, steps, "running", include_empty=True)
     scene_ids = {s.id for s in scenes}
-    return {**fields(project, PROJECT_FIELDS), **summary(project, steps, await costs(session, [project_id])),
-            # Dépenses détaillées par étape et plafond par vidéo (0 = sans limite) : de quoi justifier `cost_usd`.
-            "cost_by_step": await spent_by_step(session, project_id),
-            "budget_usd": await AppSettings(session).budget_usd(),
+    return {**fields(project, PROJECT_FIELDS), **summary(project, steps, (await spending(session, user, [project_id]))[project_id]),
+            # Dépenses détaillées par étape et plafond par vidéo (0 = sans limite) : de quoi justifier `cost_usd`. Admin seulement.
+            "cost_by_step": await spent_by_step(session, project_id) if user.is_admin else None,
+            "budget_usd": await AppSettings(session).budget_usd() if user.is_admin else None,
             "steps": [{**fields(s, STEP_FIELDS), "resume": resume.get(s.name), "progress": progress.get(s.name),
                       "target_scene": target_scene(s, scene_ids),
                       # Début de la génération en cours (la ligne n'est modifiée qu'au lancement et à la fin).
@@ -226,7 +250,7 @@ async def get_project(project_id: int, session: AsyncSession = Depends(get_sessi
             "queue": [{"id": q.id, "step": q.step, "scene_id": q.scene_id}
                       for q in await queued_runs(session, project_id)],
             "scenes": [fields(s, SCENE_FIELDS) for s in scenes],
-            "assets": [asset_out(a, storage, originals.get(a.id)) for a in assets]}
+            "assets": [asset_out(a, storage, originals.get(a.id), admin=user.is_admin) for a in assets]}
 
 
 @router.patch("/{project_id}")
@@ -240,10 +264,13 @@ async def edit_project(project_id: int, body: ProjectPatch, session: AsyncSessio
         ensure_not_running(steps, dependents)
         mark_stale(steps, dependents)
         await sync_status(session, project_id, steps)
-    if "style" in changed:  # le propriétaire du projet décide, comme pour les générations
-        owner = await session.get(User, project.user_id)
+    if changed & {"style", "target_duration_s"}:  # le forfait du propriétaire du projet décide, comme pour les générations
+        owner, app_settings = await session.get(User, project.user_id), AppSettings(session)
         assert owner is not None
-        await access.require(AppSettings(session), owner, "style", body.style or "")
+        if "style" in changed:
+            await access.require(app_settings, owner, "style", body.style or "")
+        if "target_duration_s" in changed:
+            await access.require_limit(app_settings, owner, "max_duration_s", body.target_duration_s or 0)
     for key in changed:
         setattr(project, key, getattr(body, key))
     await session.commit()
@@ -369,7 +396,9 @@ async def upload_reference(project_id: int, file: UploadFile = File(...), ref: s
     project = await project_or_404(session, project_id)
     owner = await session.get(User, project.user_id)
     assert owner is not None
-    await access.require(AppSettings(session), owner, "reference")
+    # remplacer l'image d'un élément reste permis ; un nouvel élément compte dans la limite du forfait
+    await access.require_limit(AppSettings(session), owner, "references_max",
+                               len(await reference_elements(session, project_id) | {ref}))
     steps = await load_steps(session, [project_id])
     ensure_not_running(steps, ("reference",))
 
@@ -403,8 +432,10 @@ async def delete_project(project_id: int, session: AsyncSession = Depends(get_se
 
 
 @router.get("/{project_id}/estimate")
-async def estimate(project_id: int, provider: str = "", model: str = "", session: AsyncSession = Depends(get_session),
-                   registry: ProviderRegistry = Depends(get_registry)) -> dict:
+async def estimate(project_id: int, provider: str = "", model: str = "", user: User = Depends(current_user),
+                   session: AsyncSession = Depends(get_session), registry: ProviderRegistry = Depends(get_registry)) -> dict:
+    """Coût estimé des clips en dollars : pour l'admin seulement (`cost_usd` nul pour un client, qui voit un prix en
+    crédits par `…/steps/clips/price`)."""
     await project_or_404(session, project_id)
     app_settings = AppSettings(session)
     provider = provider or await app_settings.get("default_video_provider")
@@ -418,4 +449,5 @@ async def estimate(project_id: int, provider: str = "", model: str = "", session
     except KeyError:
         raise HTTPException(400, f"Modèle vidéo inconnu pour {provider} : {model}") from None
     scene_count = await session.scalar(select(func.count()).select_from(Scene).where(Scene.project_id == project_id))
-    return {"provider": provider, "model": model, "scene_count": scene_count, "cost_usd": round(cost, 4)}
+    return {"provider": provider, "model": model, "scene_count": scene_count,
+            "cost_usd": round(cost, 4) if user.is_admin else None}

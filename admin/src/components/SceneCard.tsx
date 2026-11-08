@@ -8,6 +8,7 @@ import SceneChips from "./SceneChips";
 import { Field } from "./ui";
 import TextArea from "./TextArea";
 import { MAX_VISUAL_PROMPT } from "../limits";
+import { t } from "../i18n";
 
 interface Props {
   scene: DraftScene;
@@ -65,7 +66,7 @@ export default function SceneCard({
         </div>
       )}
       <div className="scene-card-head">
-        <h3>Scène {i + 1}</h3>
+        <h3>{t("Scène {n}", { n: i + 1 })}</h3>
         <div className="scene-card-tools">
           {collapsible && (
             <button
@@ -74,11 +75,11 @@ export default function SceneCard({
               aria-expanded={open}
               onClick={() => setOpen(!open)}
             >
-              {open ? "Replier" : "Déplier"}
+              {open ? t("Replier") : t("Déplier")}
             </button>
           )}
           <button type="button" className="btn btn-ghost btn-small" disabled={i === 0} onClick={() => onMove(i, -1)}>
-            Monter
+            {t("Monter")}
           </button>
           <button
             type="button"
@@ -86,35 +87,35 @@ export default function SceneCard({
             disabled={i === count - 1}
             onClick={() => onMove(i, 1)}
           >
-            Descendre
+            {t("Descendre")}
           </button>
           <button type="button" className="btn btn-ghost btn-small" onClick={() => onRemove(i)}>
-            Supprimer
+            {t("Supprimer")}
           </button>
         </div>
       </div>
       {cast && saved && <SceneChips scene={saved} index={at} scenes={project.scenes} cast={cast} showLink={ordered} />}
       {saved && at > 0 && ordered && onContinuity && (
-        <label className="scene-element" title="Sans la case, le clip part de l'image de référence de la scène">
+        <label className="scene-element" title={t("Sans la case, le clip part de l'image de référence de la scène")}>
           <input
             type="checkbox"
             checked={saved.continuity === "continue"}
             disabled={locked}
             onChange={(e) => onContinuity(saved.id, e.target.checked ? "continue" : "cut")}
           />
-          Enchaîner avec la scène précédente
+          {t("Enchaîner avec la scène précédente")}
         </label>
       )}
-      {!shown && <p className="muted scene-summary">{s.voice_text || "Scène vide"}</p>}
+      {!shown && <p className="muted scene-summary">{s.voice_text || t("Scène vide")}</p>}
       {shown && (
         <div className="scene-fields">
           <AssistField
-            label="Texte de la voix off"
+            label={t("Texte de la voix off")}
             kind="voice_text"
             value={s.voice_text}
             onChange={(v) => onChange(s.key, { voice_text: v })}
             context={{ projectId: project.id, sceneId: s.id, durationS: s.duration_s }}
-            scope={`scène ${i + 1}`}
+            scope={t("scène {n}", { n: i + 1 })}
             locked={locked}
             unsaved={dirty}
           >
@@ -129,12 +130,12 @@ export default function SceneCard({
             )}
           </AssistField>
           <AssistField
-            label="Prompt visuel"
+            label={t("Prompt visuel")}
             kind="visual_prompt"
             value={s.visual_prompt}
             onChange={(v) => onChange(s.key, { visual_prompt: v })}
             context={{ projectId: project.id, sceneId: s.id }}
-            scope={`scène ${i + 1}`}
+            scope={t("scène {n}", { n: i + 1 })}
             locked={locked}
             unsaved={dirty}
           >
@@ -149,7 +150,7 @@ export default function SceneCard({
               />
             )}
           </AssistField>
-          <Field label="Durée (s)">
+          <Field label={t("Durée (s)")}>
             <input
               className="input input-narrow"
               type="number"

@@ -46,7 +46,8 @@ def get_profile(model: str) -> Profile:
 
 
 def flux_files(*, kontext: bool = False) -> list[ModelFile]:
-    """Fichiers de Flux (dev, ou Kontext pour replacer une image de référence) avec ses encodeurs de texte et son VAE."""
+    """Fichiers de Flux avec ses encodeurs de texte et son VAE : dev (image de départ du profil Précision, image de
+    référence de `ComfyUIImage`) ou Kontext (`kontext=True`, quand une image de référence est replacée dans la scène)."""
     return [
         ModelFile("UnetLoaderGGUF", "unet_name", "flux1-kontext-dev-Q4_K_S.gguf" if kontext else "flux1-dev-Q4_K_S.gguf"),
         ModelFile("DualCLIPLoader", "clip_name1", "clip_l.safetensors"),

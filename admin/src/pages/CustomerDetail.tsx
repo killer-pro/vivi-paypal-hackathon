@@ -3,10 +3,11 @@ import { Link, useParams } from "react-router-dom";
 import { api, errorMessage, useApi } from "../api";
 import { Field, ErrorState } from "../components/ui";
 import { adjustBody, planLabel, type Bucket, type CustomerDetail as Detail } from "../adminSaas";
-import { formatCredits, kindLabel, type CreditEntry } from "../credits";
+import { formatCredits, kindLabel, reasonLabel, type CreditEntry } from "../credits";
 import { dateTime } from "../format";
 import "./Credits.css";
 import "./Customers.css";
+import { t } from "../i18n";
 
 /** Un compte : offre, solde par lot, ajustement manuel (motif obligatoire, tracé dans le registre) et registre. */
 export default function CustomerDetail() {
@@ -21,7 +22,7 @@ export default function CustomerDetail() {
   const [busy, setBusy] = useState(false);
 
   if (error) return <ErrorState message={error} onRetry={reload} />;
-  if (!data) return <p className="muted">Chargement…</p>;
+  if (!data) return <p className="muted">{t("Chargement…")}</p>;
   const { customer } = data;
   const entries = [...new Map([...data.entries, ...older].map((e) => [e.id, e])).values()];
   const more = olderCursor === undefined ? data.next_before_id : olderCursor;
@@ -56,40 +57,40 @@ export default function CustomerDetail() {
       <header className="page-head">
         <h1>{customer.email}</h1>
         <Link to="/clients" className="btn btn-small btn-ghost">
-          Tous les clients
+          {t("Tous les clients")}
         </Link>
       </header>
-      <section className="credit-summary" aria-label="Compte">
+      <section className="credit-summary" aria-label={t("Compte")}>
         <div className="credit-total">
           <span className="muted">{planLabel(customer)}</span>
-          <strong>{customer.role === "admin" ? "Illimité" : formatCredits(customer.balance.total)}</strong>
+          <strong>{customer.role === "admin" ? t("Illimité") : formatCredits(customer.balance.total)}</strong>
           <span className="muted">{formatCredits(customer.spent)} consommés</span>
         </div>
         <div>
-          <span className="muted">Abonnement</span>
+          <span className="muted">{t("Abonnement")}</span>
           <strong>{formatCredits(customer.balance.subscription)}</strong>
         </div>
         <div>
-          <span className="muted">Rechargés</span>
+          <span className="muted">{t("Rechargés")}</span>
           <strong>{formatCredits(customer.balance.topup)}</strong>
         </div>
       </section>
 
       {customer.role !== "admin" && (
         <form className="adjust-form" onSubmit={submit}>
-          <h2>Ajuster les crédits</h2>
+          <h2>{t("Ajuster les crédits")}</h2>
           <div className="adjust-fields">
-            <Field label="Montant (négatif pour retirer)">
+            <Field label={t("Montant (négatif pour retirer)")}>
               <input className="input" inputMode="numeric" value={amount} placeholder="+50 ou -20" onChange={(e) => setAmount(e.target.value)} />
             </Field>
-            <Field label="Lot">
+            <Field label={t("Lot")}>
               <select className="input" value={bucket} onChange={(e) => setBucket(e.target.value as Bucket)}>
-                <option value="topup">Rechargés</option>
-                <option value="subscription">Abonnement</option>
+                <option value="topup">{t("Rechargés")}</option>
+                <option value="subscription">{t("Abonnement")}</option>
               </select>
             </Field>
-            <Field label="Motif">
-              <input className="input" value={reason} maxLength={300} placeholder="Ex. geste commercial" onChange={(e) => setReason(e.target.value)} />
+            <Field label={t("Motif")}>
+              <input className="input" value={reason} maxLength={300} placeholder={t("Ex. geste commercial")} onChange={(e) => setReason(e.target.value)} />
             </Field>
           </div>
           {status.error && (
@@ -97,26 +98,26 @@ export default function CustomerDetail() {
               {status.error}
             </p>
           )}
-          {status.done && <p className="muted">Ajustement enregistré.</p>}
+          {status.done && <p className="muted">{t("Ajustement enregistré.")}</p>}
           <button className="btn btn-primary" disabled={busy}>
-            Enregistrer l'ajustement
+            {t("Enregistrer l'ajustement")}
           </button>
         </form>
       )}
 
-      <h2 className="credit-history-title">Registre</h2>
+      <h2 className="credit-history-title">{t("Registre")}</h2>
       {entries.length === 0 ? (
-        <p className="muted">Aucun mouvement.</p>
+        <p className="muted">{t("Aucun mouvement.")}</p>
       ) : (
         <div className="table-wrap">
           <table className="table credit-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Mouvement</th>
-                <th>Lot</th>
-                <th>Motif</th>
-                <th className="num">Crédits</th>
+                <th>{t("Date")}</th>
+                <th>{t("Mouvement")}</th>
+                <th>{t("Lot")}</th>
+                <th>{t("Motif")}</th>
+                <th className="num">{t("Crédits")}</th>
               </tr>
             </thead>
             <tbody>
@@ -124,8 +125,8 @@ export default function CustomerDetail() {
                 <tr key={e.id}>
                   <td className="nowrap">{dateTime.format(new Date(e.created_at))}</td>
                   <td>{kindLabel(e.kind)}</td>
-                  <td>{e.bucket === "topup" ? "Rechargés" : "Abonnement"}</td>
-                  <td className="muted">{e.reason}</td>
+                  <td>{e.bucket === "topup" ? t("Rechargés") : t("Abonnement")}</td>
+                  <td className="muted">{reasonLabel(e.reason)}</td>
                   <td className={`num ${e.amount > 0 ? "credit-in" : ""}`}>{e.amount > 0 ? `+${e.amount}` : e.amount}</td>
                 </tr>
               ))}
@@ -135,7 +136,7 @@ export default function CustomerDetail() {
       )}
       {more !== null && (
         <button className="btn" onClick={loadMore}>
-          Afficher plus
+          {t("Afficher plus")}
         </button>
       )}
     </>

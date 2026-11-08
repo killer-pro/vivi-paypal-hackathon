@@ -242,7 +242,7 @@ async def test_settings_gemini_model_accepts_ids(api):
 
 async def test_providers_models_lists_gemini_models(api):
     data = (await api.get("/api/providers/models")).json()
-    assert data["llm"] == {"gemini": list(PRICES)}
+    assert data["llm"]["gemini"] == list(PRICES) and data["llm"]["groq"][0] == "openai/gpt-oss-120b"
 
 
 async def test_gemini_structured_output_only_when_schema_given():

@@ -46,7 +46,7 @@ dépend. Une seed aléatoire par prompt, un seul ComfyUI, clips générés l'un 
   contrôle au lancement : ils ne peuvent pas diverger.
 
 ## Image de référence (tous les profils)
-Une image par élément récurrent du script, choisie par scène : `docs/references.md`.
+Une image par élément récurrent du script, choisie par scène : `docs/references.md`. Elle peut être générée par Gemini, fal (`flux`) ou ComfyUI (`flux-dev`, même graphe Flux dev que l'image de départ de Précision, 576×1008, ≈ 3 min) : disponible si les fichiers de `flux_files()` sont installés. Les modèles restent chargés entre deux images et sont déchargés à la fin de l'étape.
 
 Si le projet a une image de référence (étape facultative), **chaque scène part d'elle**, quel que soit le profil : Flux
 Kontext la replace dans la scène (mêmes personnages, mêmes marques), puis Wan 2.2 I2V l'anime à la résolution du profil
@@ -129,7 +129,11 @@ servi en `poster` de la variante Précision dans l'étape Clips.
 ## Cartes (`admin/src/components/ModelCards.tsx`, styles `ModelCards.css`)
 - Groupe radio accessible : `role="radiogroup"` libellé, une carte = `<label>` autour d'un `<input type="radio">` natif
   (flèches du clavier, focus visible sur toute la carte via `:has(input:focus-visible)`).
-- Regroupées par provider (ComfyUI d'abord, groupe de la carte recommandée, puis fal.ai), dans l'ordre de l'API.
+- Regroupées par provider : les groupes qui ont une carte disponible d'abord, puis, à égalité, celui de la carte
+  recommandée ; dans chaque groupe, cartes disponibles d'abord (`models.ts::groupOrder`, `availableFirst`). Les listes
+  d'images de référence sont triées de même (`imageOptions`). Un client voit « Indisponible pour le moment » sous une
+  carte indisponible, l'admin le motif technique. Un choix indisponible bascule sur la carte recommandée ou la première
+  disponible (`pickable`).
 - Contenu : nom, pastille « recommandé » (carte `recommended` de l'API : Rapide), durée ou coût par clip, étoiles de
   vitesse et de qualité (lues « 3,5 sur 5 » par un lecteur d'écran, « non noté » pour un modèle cloud), description.
 - Carte indisponible : radio `disabled`, nom et étoiles estompés, « Indisponible : <raison> » en clair (ex. « Clé fal

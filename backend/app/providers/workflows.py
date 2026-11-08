@@ -65,8 +65,8 @@ def i2v_workflow(profile: Profile, prompt: str, seed: int, frames: int, image_na
     return _video("wan22-14b-i2v", profile, prompt, seed, frames, image_name)
 
 
-def keyframe_workflow(profile: Profile, prompt: str, seed: int) -> dict:
-    """Image de départ Flux, taille fixe 576×1008 (indépendante du profil, dont `width`/`height` sont ceux de l'I2V)."""
+def keyframe_workflow(prompt: str, seed: int) -> dict:
+    """Image Flux dev, taille fixe 576×1008 (celle de l'I2V dépend du profil, pas celle-ci)."""
     return _load("flux-keyframe", {"SEED": seed}, prompt)
 
 
@@ -92,3 +92,28 @@ def kontext_workflow(prompt: str, seed: int, image_names: list[str]) -> dict:
         latent = reference
     workflow[KONTEXT_GUIDANCE_NODE]["inputs"]["conditioning"] = [latent, 0]
     return workflow
+
+
+# Comfy Cloud n'a pas les chargeurs GGUF de nos graphes locaux : chaque modèle Q4 est remplacé par sa version fp8 (ou
+# entière pour Flux dev), chargée par `UNETLoader` (relevé le 2026-11-07 dans `GET /api/object_info`).
+CLOUD_UNETS = {
+    **{f"Wan2.2-{kind.upper()}-A14B-{level}Noise-Q4_K_M.gguf": f"wan2.2_{kind}_{level.lower()}_noise_14B_fp8_scaled.safetensors"
+       for kind in ("t2v", "i2v") for level in ("High", "Low")},
+    "flux1-dev-Q4_K_S.gguf": "flux1-dev.safetensors",
+    "flux1-kontext-dev-Q4_K_S.gguf": "flux1-dev-kontext_fp8_scaled.safetensors",
+}
+CLOUD_UPSCALER = "4x-UltraSharp.pth"  # à la racine des modèles d'agrandissement, pas sous ESRGAN/
+
+
+def cloud_workflow(workflow: dict) -> dict:
+    """Graphe local adapté à Comfy Cloud : chargeurs GGUF remplacés par `UNETLoader` et noms de fichiers du cloud. Un
+    modèle sans équivalent lève `KeyError` (le graphe serait refusé de toute façon)."""
+    adapted = json.loads(json.dumps(workflow))
+    for node in adapted.values():
+        inputs = node["inputs"]
+        if node["class_type"] == "UnetLoaderGGUF":
+            node["class_type"] = "UNETLoader"
+            node["inputs"] = {"unet_name": CLOUD_UNETS[inputs["unet_name"]], "weight_dtype": "default"}
+        elif node["class_type"] == "UpscaleModelLoader" and inputs.get("model_name") == ESRGAN_MODEL:
+            inputs["model_name"] = CLOUD_UPSCALER
+    return adapted

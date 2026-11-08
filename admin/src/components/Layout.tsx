@@ -3,19 +3,22 @@ import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api, errorMessage, useApi } from "../api";
 import { visibleNav, type Me } from "../auth";
 import { MeContext } from "../hooks/useMe";
-import { CoinIcon, CostsIcon, LogoutIcon, MusicIcon, ProjectsIcon, ScenesIcon, SettingsIcon } from "./icons";
+import { CoinIcon, CostsIcon, LogoutIcon, MusicIcon, PlansIcon, ProjectsIcon, ScenesIcon, SettingsIcon } from "./icons";
 import CreditBalance from "./CreditBalance";
+import LangSwitch from "./LangSwitch";
 import RouteErrorBoundary from "./RouteErrorBoundary";
 import { ErrorState } from "./ui";
 import "./Layout.css";
+import { t } from "../i18n";
 
 const NAV = [
-  { to: "/", label: "Projets", icon: <ProjectsIcon />, end: true },
-  { to: "/music", label: "Musique", icon: <MusicIcon />, adminOnly: true },
-  { to: "/clients", label: "Clients", icon: <ScenesIcon />, adminOnly: true },
-  { to: "/pricing", label: "Tarifs", icon: <CoinIcon />, adminOnly: true },
-  { to: "/providers", label: "Réglages", icon: <SettingsIcon />, adminOnly: true },
-  { to: "/costs", label: "Coûts", icon: <CostsIcon /> },
+  { to: "/", label: t("Projets"), icon: <ProjectsIcon />, end: true },
+  { to: "/plans", label: t("Forfaits"), icon: <PlansIcon /> },
+  { to: "/music", label: t("Musique"), icon: <MusicIcon />, adminOnly: true },
+  { to: "/clients", label: t("Clients"), icon: <ScenesIcon />, adminOnly: true },
+  { to: "/pricing", label: t("Tarifs"), icon: <CoinIcon />, adminOnly: true },
+  { to: "/providers", label: t("Réglages"), icon: <SettingsIcon />, adminOnly: true },
+  { to: "/costs", label: t("Coûts"), icon: <CostsIcon />, adminOnly: true },
 ];
 
 /** Coque des écrans connectés : vérifie la session (`GET /auth/me`), fournit le compte (`useMe`) puis affiche la barre
@@ -32,7 +35,7 @@ export default function Layout() {
       await api("/auth/logout", { method: "POST" });
       navigate("/login");
     } catch (err) {
-      setLogoutError(`Déconnexion impossible. ${errorMessage(err)}`);
+      setLogoutError(t("Déconnexion impossible. {error}", { error: errorMessage(err) }));
     }
   }
 
@@ -75,14 +78,15 @@ export default function Layout() {
             <CreditBalance />
           </nav>
           <div className="logout">
+            <LangSwitch />
             {logoutError && (
               <p className="error" role="alert">
                 {logoutError}
               </p>
             )}
-            <button className="nav-link" onClick={logout} title="Se déconnecter">
+            <button className="nav-link" onClick={logout} title={t("Se déconnecter")}>
               <LogoutIcon />
-              <span>Sortir</span>
+              <span>{t("Sortir")}</span>
             </button>
           </div>
         </aside>
@@ -105,7 +109,7 @@ function VerifyBanner() {
     setState({ busy: true });
     try {
       await api("/auth/resend", { method: "POST" });
-      setState({ message: "Lien envoyé : consultez votre boîte de réception." });
+      setState({ message: t("Lien envoyé : consultez votre boîte de réception.") });
     } catch (err) {
       setState({ message: errorMessage(err), error: true });
     }
@@ -113,10 +117,10 @@ function VerifyBanner() {
 
   return (
     <div className="verify-banner" role="status">
-      <span>Confirmez votre adresse e-mail</span>
+      <span>{t("Confirmez votre adresse e-mail")}</span>
       {state.message && <span className={state.error ? "error" : "muted"}>{state.message}</span>}
       <button className="btn btn-small btn-ghost" onClick={resend} disabled={state.busy}>
-        Renvoyer le lien
+        {t("Renvoyer le lien")}
       </button>
     </div>
   );

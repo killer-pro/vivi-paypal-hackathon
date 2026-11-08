@@ -2,7 +2,7 @@
 export type Settings = Record<string, string>;
 
 const MASK = "••••";
-export const SECRET_KEYS = new Set(["anthropic_api_key", "gemini_api_key", "fal_key", "elevenlabs_api_key", "langfuse_secret_key"]);
+export const SECRET_KEYS = new Set(["anthropic_api_key", "gemini_api_key", "groq_api_key", "fal_key", "comfy_cloud_api_key", "elevenlabs_api_key", "langfuse_secret_key"]);
 
 /**
  * Corps du `PUT /settings` : seulement les champs modifiés. Un secret se saisit dans un champ vide (vide = inchangé) ;

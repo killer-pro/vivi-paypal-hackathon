@@ -6,6 +6,7 @@ import ImportTrack from "../ImportTrack";
 import { ErrorState } from "../ui";
 import { clock } from "../../format";
 import { useMe } from "../../hooks/useMe";
+import { t } from "../../i18n";
 
 export default function MusicPanel(props: PanelProps) {
   const { flow, step, locked } = props;
@@ -22,7 +23,7 @@ export default function MusicPanel(props: PanelProps) {
   );
 
   return (
-    <StepPanel {...props} runLabel="Confirmer le choix">
+    <StepPanel {...props} runLabel={t("Confirmer le choix")}>
       {isAdmin && (
         <div className="track-import">
           <ImportTrack
@@ -34,9 +35,9 @@ export default function MusicPanel(props: PanelProps) {
         </div>
       )}
       {tracks.error && <ErrorState message={tracks.error} onRetry={tracks.reload} />}
-      {!tracks.data && !tracks.error && <p className="muted">Chargement de la bibliothèque…</p>}
+      {!tracks.data && !tracks.error && <p className="muted">{t("Chargement de la bibliothèque…")}</p>}
       {tracks.data && (
-        <div className="track-list" role="radiogroup" aria-label="Musique de fond">
+        <div className="track-list" role="radiogroup" aria-label={t("Musique de fond")}>
           {tracks.data.map((t) =>
             option(
               t.id,
@@ -51,7 +52,7 @@ export default function MusicPanel(props: PanelProps) {
               </>,
             ),
           )}
-          {option(null, <span className="track-name">Sans musique</span>)}
+          {option(null, <span className="track-name">{t("Sans musique")}</span>)}
         </div>
       )}
     </StepPanel>

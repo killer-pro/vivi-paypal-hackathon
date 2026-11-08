@@ -5,6 +5,7 @@ import { CONTINUITY_LABELS, ELEMENT_KINDS, elementCounts, speakingElements, type
 import TextArea from "../TextArea";
 import "../Cast.css";
 import { Field, FormActions } from "../ui";
+import { locale, t } from "../../i18n";
 
 type Draft = ReturnType<typeof useStoryDraft>;
 
@@ -32,15 +33,15 @@ export default function StoryView({ draft, warnings, locked, voices, targetS, on
         </ul>
       )}
       <section className="plan-section" aria-labelledby="story-style">
-        <h2 id="story-style">Style</h2>
-        <Field label="Style, décor et palette (en anglais)">
+        <h2 id="story-style">{t("Style")}</h2>
+        <Field label={t("Style, décor et palette (en anglais)")}>
           <TextArea className="input" rows={3} value={story.bible} onChange={(e) => draft.setBible(e.target.value)} />
         </Field>
       </section>
 
       <section className="plan-section" aria-labelledby="story-elements">
-        <SectionHead id="story-elements" title="Éléments suivis" count={elementCounts(story.elements)} />
-        <p className="muted story-lead">Leur apparence est recopiée à l'identique dans chaque scène où ils apparaissent.</p>
+        <SectionHead id="story-elements" title={t("Éléments suivis")} count={elementCounts(story.elements)} />
+        <p className="muted story-lead">{t("Leur apparence est recopiée à l'identique dans chaque scène où ils apparaissent.")}</p>
         {story.elements.length > 0 ? (
           <ul className="scene-list">
             {story.elements.map((e) => (
@@ -49,8 +50,7 @@ export default function StoryView({ draft, warnings, locked, voices, targetS, on
           </ul>
         ) : (
           <EmptyNote>
-            Aucun élément suivi : ajoutez le personnage, l'accessoire ou le lieu qui doit rester identique d'une scène à
-            l'autre.
+            {t("Aucun élément suivi : ajoutez le personnage, l'accessoire ou le lieu qui doit rester identique d'une scène à l'autre.")}
           </EmptyNote>
         )}
         <AddElement locked={locked} onAdd={draft.addElement} />
@@ -59,10 +59,10 @@ export default function StoryView({ draft, warnings, locked, voices, targetS, on
       <section className="plan-section" aria-labelledby="story-beats">
         <SectionHead
           id="story-beats"
-          title="Beats"
-          count={`${story.beats.length} beat${story.beats.length > 1 ? "s" : ""}, ${total.toLocaleString("fr-FR")} s sur ${targetS} s visées`}
+          title={t("Beats")}
+          count={t(story.beats.length > 1 ? "{n} beats, {total} s sur {target} s visées" : "{n} beat, {total} s sur {target} s visées", { n: story.beats.length, total: total.toLocaleString(locale), target: targetS })}
         />
-        <p className="muted story-lead">Chaque beat deviendra une scène.</p>
+        <p className="muted story-lead">{t("Chaque beat deviendra une scène.")}</p>
         {story.beats.length > 0 ? (
           <ol className="scene-list">
             {story.beats.map((b, i) => (
@@ -70,11 +70,11 @@ export default function StoryView({ draft, warnings, locked, voices, targetS, on
             ))}
           </ol>
         ) : (
-          <EmptyNote>Aucun beat : ajoutez-en un pour chaque moment de la vidéo.</EmptyNote>
+          <EmptyNote>{t("Aucun beat : ajoutez-en un pour chaque moment de la vidéo.")}</EmptyNote>
         )}
         <div>
           <button type="button" className="btn" onClick={draft.addBeat}>
-            Ajouter un beat
+            {t("Ajouter un beat")}
           </button>
         </div>
       </section>
@@ -91,7 +91,7 @@ export default function StoryView({ draft, warnings, locked, voices, targetS, on
       )}
       {dirty && (
         <FormActions
-          submitLabel="Enregistrer l'histoire"
+          submitLabel={t("Enregistrer l'histoire")}
           onCancel={draft.reset}
           disabled={locked || unknown.length > 0 || blank >= 0}
         />
@@ -133,16 +133,16 @@ function ElementCard({
         <span className="cast-chip">{ELEMENT_KINDS[e.kind]}</span>
         <div className="scene-card-tools">
           <button type="button" className="btn btn-ghost btn-small" disabled={locked} onClick={() => draft.removeElement(e.id)}>
-            Supprimer
+            {t("Supprimer")}
           </button>
         </div>
       </div>
       <div className="scene-fields">
         <div className="story-row">
-          <Field label="Nom">
+          <Field label={t("Nom")}>
             <input className="input" value={e.name} onChange={(ev) => draft.updateElement(e.id, { name: ev.target.value })} />
           </Field>
-          <Field label="Type">
+          <Field label={t("Type")}>
             <select
               className="input"
               value={e.kind}
@@ -156,13 +156,13 @@ function ElementCard({
             </select>
           </Field>
         </div>
-        <Field label="Apparence figée (en anglais)">
+        <Field label={t("Apparence figée (en anglais)")}>
           <TextArea className="input" value={e.descriptor} onChange={(ev) => draft.updateElement(e.id, { descriptor: ev.target.value })} />
         </Field>
         {e.kind === "character" && (
-          <Field label="Voix quand il parle">
+          <Field label={t("Voix quand il parle")}>
             <select className="input" value={e.voice_id} onChange={(ev) => draft.updateElement(e.id, { voice_id: ev.target.value })}>
-              <option value="">Voix par défaut</option>
+              <option value="">{t("Voix par défaut")}</option>
               {withCurrent(voices.map((v) => v.id), e.voice_id).map((id) => (
                 <option key={id} value={id}>
                   {voiceLabel(voices, id)}
@@ -172,7 +172,7 @@ function ElementCard({
           </Field>
         )}
         {e.kind !== "place" && (
-          <Field label="Image de référence (prompt, en anglais)">
+          <Field label={t("Image de référence (prompt, en anglais)")}>
             <TextArea className="input" value={e.prompt} onChange={(ev) => draft.updateElement(e.id, { prompt: ev.target.value })} />
           </Field>
         )}
@@ -192,8 +192,8 @@ function AddElement({ locked, onAdd }: { locked: boolean; onAdd: (name: string) 
     <div className="story-add">
       <input
         className="input"
-        placeholder="Nom du nouvel élément"
-        aria-label="Nom du nouvel élément"
+        placeholder={t("Nom du nouvel élément")}
+        aria-label={t("Nom du nouvel élément")}
         value={name}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => {
@@ -204,7 +204,7 @@ function AddElement({ locked, onAdd }: { locked: boolean; onAdd: (name: string) 
         }}
       />
       <button type="button" className="btn" disabled={locked || !name.trim()} onClick={add}>
-        Ajouter un élément
+        {t("Ajouter un élément")}
       </button>
     </div>
   );
@@ -228,28 +228,28 @@ function BeatCard({
     <li className="scene-card">
       <div className="scene-card-head">
         <h4>Beat {i + 1}</h4>
-        {Number.isFinite(b.duration_s) && <span className="muted">{b.duration_s.toLocaleString("fr-FR")} s</span>}
+        {Number.isFinite(b.duration_s) && <span className="muted">{b.duration_s.toLocaleString(locale)} s</span>}
         <div className="scene-card-tools">
           <button type="button" className="btn btn-ghost btn-small" disabled={i === 0} onClick={() => draft.moveBeat(i, -1)}>
-            Monter
+            {t("Monter")}
           </button>
           <button type="button" className="btn btn-ghost btn-small" disabled={i === count - 1} onClick={() => draft.moveBeat(i, 1)}>
-            Descendre
+            {t("Descendre")}
           </button>
           <button type="button" className="btn btn-ghost btn-small" onClick={() => draft.removeBeat(i)}>
-            Supprimer
+            {t("Supprimer")}
           </button>
         </div>
       </div>
       <div className="scene-fields">
-        <Field label="Ce qui se passe">
+        <Field label={t("Ce qui se passe")}>
           <TextArea className="input" required value={b.summary} onChange={(e) => draft.updateBeat(b.key, { summary: e.target.value })} />
         </Field>
-        <Field label="Texte de la voix off">
+        <Field label={t("Texte de la voix off")}>
           <TextArea className="input" required value={b.voice_text} onChange={(e) => draft.updateBeat(b.key, { voice_text: e.target.value })} />
         </Field>
         <div className="story-row">
-          <Field label="Durée (s)">
+          <Field label={t("Durée (s)")}>
             <input
               className="input input-narrow"
               type="number"
@@ -260,9 +260,9 @@ function BeatCard({
               onChange={(e) => draft.updateBeat(b.key, { duration_s: e.target.valueAsNumber })}
             />
           </Field>
-          <Field label="Qui parle">
+          <Field label={t("Qui parle")}>
             <select className="input" value={b.speaker} onChange={(e) => draft.updateBeat(b.key, { speaker: e.target.value })}>
-              <option value="">Le narrateur</option>
+              <option value="">{t("Le narrateur")}</option>
               {speakingElements(elements).map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name || c.id}
@@ -271,7 +271,7 @@ function BeatCard({
             </select>
           </Field>
           {i > 0 && (
-            <Field label="Enchaînement">
+            <Field label={t("Enchaînement")}>
               <select
                 className="input"
                 value={b.continuity}
@@ -287,7 +287,7 @@ function BeatCard({
           )}
         </div>
         <fieldset className="story-presence">
-          <legend>Visible dans ce beat</legend>
+          <legend>{t("Visible dans ce beat")}</legend>
           {elements.map((e) => (
             <div key={e.id} className="story-presence-row">
               <label>
@@ -301,8 +301,8 @@ function BeatCard({
               {present.has(e.id) && (
                 <input
                   className="input"
-                  aria-label={`État de ${e.name || e.id}`}
-                  placeholder="État (en anglais), ex. wet"
+                  aria-label={t("État de {name}", { name: e.name || e.id })}
+                  placeholder={t("État (en anglais), ex. wet")}
                   value={present.get(e.id)}
                   onChange={(ev) => draft.setPresence(b.key, e.id, ev.target.value)}
                 />

@@ -2,6 +2,7 @@ import type { CreditEntry, CreditsBalance } from "./credits";
 import { longDate } from "./format";
 import type { Settings } from "./settings";
 import { STEP_LABELS, type StepName } from "./steps";
+import { locale, t } from "./i18n";
 
 /** Un compte de `GET /api/admin/customers`. */
 export interface Customer {
@@ -54,19 +55,19 @@ export interface AdjustBody {
 /** Corps de `POST /admin/customers/{id}/credits`, ou le message à afficher si la saisie est incorrecte. */
 export function adjustBody(amount: string, bucket: Bucket, reason: string): AdjustBody | string {
   const value = Number(amount.trim().replace(/^\+/, ""));
-  if (!/^[+-]?\d+$/.test(amount.trim()) || value === 0) return "Le montant doit être un nombre entier de crédits, positif ou négatif.";
-  if (!reason.trim()) return "Indiquez le motif de l'ajustement.";
+  if (!/^[+-]?\d+$/.test(amount.trim()) || value === 0) return t("Le montant doit être un nombre entier de crédits, positif ou négatif.");
+  if (!reason.trim()) return t("Indiquez le motif de l'ajustement.");
   return { amount: value, bucket, reason: reason.trim() };
 }
 
 export function planLabel(c: Customer): string {
   if (c.role === "admin") return "Administrateur";
   return c.subscribed && c.subscription_ends_at
-    ? `Abonné jusqu'au ${longDate.format(new Date(c.subscription_ends_at))}`
-    : "Sans abonnement";
+    ? t("Abonné jusqu'au {date}", { date: longDate.format(new Date(c.subscription_ends_at)) })
+    : t("Sans abonnement");
 }
 
-const ratioFormat = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 2 });
+const ratioFormat = new Intl.NumberFormat(locale, { maximumFractionDigits: 2 });
 
 /** Marge observée : « ×2,5 », ou « — » quand le coût de revient est nul. */
 export function ratioLabel(ratio: number | null): string {
@@ -158,12 +159,12 @@ export function pricingBody(saved: Settings, draft: PricingDraft): Settings {
 
 export const PROFILE_LABELS: Record<(typeof CLIP_PROFILES)[number], string> = {
   fast: "Rapide",
-  balanced: "Équilibré",
-  precision: "Précision",
+  balanced: t("Équilibré"),
+  precision: t("Précision"),
   max: "Maximum",
 };
 
 /** Libellé d'une ligne du tableau des marges (`assist` : l'assistant IA, chat du plan compris). */
 export function actionLabel(step: string): string {
-  return step === "assist" ? "Assistant IA" : step === "plan_chat" ? "Chat du plan" : (STEP_LABELS[step as StepName] ?? step);
+  return step === "assist" ? t("Assistant IA") : step === "plan_chat" ? t("Chat du plan") : (STEP_LABELS[step as StepName] ?? step);
 }

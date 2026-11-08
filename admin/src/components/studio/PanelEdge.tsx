@@ -1,6 +1,7 @@
 import type { KeyboardEvent, PointerEvent } from "react";
 import { PANEL_LIMITS, type PanelId } from "../../hooks/usePanelLayout";
 import { ChevronLeftIcon, ChevronRightIcon } from "../icons";
+import { t } from "../../i18n";
 
 const KEY_STEP = 16;
 
@@ -64,7 +65,7 @@ export default function PanelEdge({
           className="edge-grip"
           role="separator"
           aria-orientation="vertical"
-          aria-label={`Largeur de ${label}`}
+          aria-label={t("Largeur de {label}", { label })}
           aria-valuenow={width}
           aria-valuemin={min}
           aria-valuemax={max}

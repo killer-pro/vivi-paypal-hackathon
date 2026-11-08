@@ -97,7 +97,10 @@ export interface Project {
   autopilot: boolean;
   current_step: StepName | null;
   current_status: StepStatus | null;
-  cost_usd: number;
+  /** Dépense en dollars : admin seulement (nulle pour un client). */
+  cost_usd: number | null;
+  /** Crédits pris par le projet : client seulement (nul pour l'admin). */
+  credits_spent: number | null;
   created_at: string;
 }
 
@@ -158,9 +161,9 @@ export interface ProjectDetail extends Project {
   style: string;
   metadata_json: Record<string, unknown>;
   /** Dépenses par étape (assistant IA sous `assist`), seules celles qui ont coûté : justifie `cost_usd`. */
-  cost_by_step: Record<string, number>;
-  /** Plafond par vidéo en dollars, 0 = sans limite. */
-  budget_usd: number;
+  cost_by_step: Record<string, number> | null;
+  /** Plafond par vidéo en dollars, 0 = sans limite ; admin seulement. */
+  budget_usd: number | null;
   steps: Step[];
   queue: QueuedRun[];
   scenes: Scene[];
@@ -211,7 +214,8 @@ export interface Estimate {
   provider: string;
   model: string;
   scene_count: number;
-  cost_usd: number;
+  /** Admin seulement (nul pour un client). */
+  cost_usd: number | null;
 }
 
 /** Élément récurrent (personnage, produit) que le script a listé : son image de référence reste la même d'une scène à l'autre. */

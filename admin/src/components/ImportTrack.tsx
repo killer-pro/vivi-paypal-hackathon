@@ -3,6 +3,7 @@ import { api, errorMessage, type MusicTrack } from "../api";
 import { UploadIcon } from "./icons";
 import { Field, FormActions, Modal } from "./ui";
 import "./ImportTrack.css";
+import { t } from "../i18n";
 
 /** Bouton « Importer une piste » et sa fenêtre (fichier audio, nom, tags) : bibliothèque musicale et étape Musique. */
 export default function ImportTrack({
@@ -17,7 +18,7 @@ export default function ImportTrack({
   return (
     <>
       <button type="button" className={primary ? "btn btn-primary" : "btn"} onClick={() => setOpen(true)}>
-        <UploadIcon /> Importer une piste
+        <UploadIcon /> {t("Importer une piste")}
       </button>
       {open && (
         <ImportModal
@@ -65,9 +66,9 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
   }
 
   return (
-    <Modal title="Importer une piste" onClose={onClose}>
+    <Modal title={t("Importer une piste")} onClose={onClose}>
       <form className="form" onSubmit={submit}>
-        <Field label="Fichier audio (50 Mo maximum)">
+        <Field label={t("Fichier audio (50 Mo maximum)")}>
           <input
             className="input file-input"
             type="file"
@@ -76,13 +77,13 @@ function ImportModal({ onClose, onImported }: { onClose: () => void; onImported:
             onChange={(e) => pick(e.target.files?.[0] ?? null)}
           />
         </Field>
-        <Field label="Nom">
+        <Field label={t("Nom")}>
           <input className="input" required value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
-        <Field label="Tags, séparés par des virgules">
+        <Field label={t("Tags, séparés par des virgules")}>
           <input
             className="input"
-            placeholder="calme, lo-fi, motivation"
+            placeholder={t("calme, lo-fi, motivation")}
             value={tags}
             onChange={(e) => setTags(e.target.value)}
           />

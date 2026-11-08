@@ -34,7 +34,7 @@ facturés, sont exclus. L'écran signale en couleur les marges sous la marge vis
 ## Limites connues
 - Pas de ventilation par profil de génération : le profil n'est pas enregistré avec l'appel ni la réservation, le
   tableau est par action.
-- Le revenu est estimé au prix nominal du crédit (0,05 $), pas aux paiements réellement encaissés (les packs sont
+- Le revenu est estimé au prix nominal du crédit (0,01 $), pas aux paiements réellement encaissés (les packs sont
   dégressifs, le crédit d'inscription est gratuit).
 - Pas de suppression de compte ni de changement d'offre depuis l'écran ; l'abonnement se pilote par Stripe
   (`docs/paiement.md`) ou `scripts/set_subscription.py`.

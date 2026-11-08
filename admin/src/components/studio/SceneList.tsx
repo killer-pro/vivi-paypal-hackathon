@@ -5,6 +5,7 @@ import { clock } from "../../format";
 import type { Activity } from "../../studio";
 import { ChevronDownIcon, ChevronUpIcon } from "../icons";
 import SceneChips from "../SceneChips";
+import { t } from "../../i18n";
 
 /** Vrai si la scène d'indice `i` part de la dernière image de la précédente. */
 const chainedAt = (scenes: ProjectDetail["scenes"], i: number) => sceneLink(scenes, i)?.kind === "chain";
@@ -42,10 +43,10 @@ export default function SceneList({
   }, [index]);
 
   return (
-    <nav className={collapsed ? "scene-rail is-collapsed" : "scene-rail"} aria-label="Scènes">
+    <nav className={collapsed ? "scene-rail is-collapsed" : "scene-rail"} aria-label={t("Scènes")}>
       {children}
       <div className="scene-rail-body" inert={collapsed}>
-        <h2>{`Scènes (${project.scenes.length})`}</h2>
+        <h2>{t("Scènes ({n})", { n: project.scenes.length })}</h2>
         <ol ref={list}>
           {project.scenes.map((scene, i) => {
             const clip = project.assets.find((a) => a.id === scene.selected_clip_asset_id);
@@ -71,14 +72,14 @@ export default function SceneList({
                       </>
                     )}
                   </span>
-                  <span className="scene-text">{scene.voice_text || "Scène sans texte"}</span>
+                  <span className="scene-text">{scene.voice_text || t("Scène sans texte")}</span>
                   <span className="scene-flags">
                     <span className="scene-duration">{clock(scene.duration_s)}</span>
                     <span className={clip ? "flag lane-clip is-on" : "flag lane-clip"}>
-                      Clip{!clip && <span className="sr-only"> manquant</span>}
+                      {t("Clip")}{!clip && <span className="sr-only"> {t("manquant")}</span>}
                     </span>
                     <span className={voice ? "flag lane-voice is-on" : "flag lane-voice"}>
-                      Voix{!voice && <span className="sr-only"> manquante</span>}
+                      {t("Voix")}{!voice && <span className="sr-only"> {t("manquante")}</span>}
                     </span>
                   </span>
                 </button>
@@ -90,17 +91,17 @@ export default function SceneList({
                       className="btn btn-small btn-ghost"
                       disabled={locked || i === 0}
                       onClick={() => onMove(-1)}
-                      title="Monter la scène"
+                      title={t("Monter la scène")}
                     >
-                      <ChevronUpIcon /> Monter
+                      <ChevronUpIcon /> {t("Monter")}
                     </button>
                     <button
                       className="btn btn-small btn-ghost"
                       disabled={locked || i === project.scenes.length - 1}
                       onClick={() => onMove(1)}
-                      title="Descendre la scène"
+                      title={t("Descendre la scène")}
                     >
-                      <ChevronDownIcon /> Descendre
+                      <ChevronDownIcon /> {t("Descendre")}
                     </button>
                   </div>
                 )}

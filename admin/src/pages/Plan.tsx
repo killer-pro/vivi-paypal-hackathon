@@ -18,6 +18,7 @@ import { useProject, type Flow } from "../hooks/useProject";
 import { needsPlanScreen, planLocks, planPhase, storyNeedsApproval } from "../planChat";
 import type { ProjectDetail } from "../api";
 import "./Plan.css";
+import { t } from "../i18n";
 
 /** Route `/projects/:id/plan` : un changement de projet remonte l'écran (brouillons remis à zéro). */
 export default function PlanPage() {
@@ -35,7 +36,7 @@ function Plan({ id }: { id: number }) {
         {flow.loadError ? (
           <ErrorState message={flow.loadError} onRetry={flow.refresh} />
         ) : (
-          <p className="muted">Chargement…</p>
+          <p className="muted">{t("Chargement…")}</p>
         )}
       </main>
     );
@@ -89,7 +90,7 @@ function PlanScreen({ flow, project }: { flow: Flow; project: ProjectDetail }) {
   return (
     <div className="plan">
       <header className="plan-head">
-        <Link className="back" to="/" aria-label="Retour aux projets" title="Retour aux projets">
+        <Link className="back" to="/" aria-label={t("Retour aux projets")} title={t("Retour aux projets")}>
           <BackIcon />
         </Link>
         <TitleField title={project.title} onRename={flow.rename} locked={flow.busy} />
@@ -102,37 +103,37 @@ function PlanScreen({ flow, project }: { flow: Flow; project: ProjectDetail }) {
       {phase === "generating" && (
         <PlanProgress
           steps={project.steps}
-          title="L'IA prépare votre plan"
-          lead="Chaque étape part de la précédente ; vous pourrez tout relire et modifier."
+          title={t("L'IA prépare votre plan")}
+          lead={t("Chaque étape part de la précédente ; vous pourrez tout relire et modifier.")}
         >
           <button
             className="btn"
             disabled={flow.busy}
             onClick={() =>
               confirm({
-                title: "Arrêter le plan ?",
-                message: "La génération du plan est abandonnée ; vous pourrez la relancer.",
-                confirmLabel: "Arrêter",
+                title: t("Arrêter le plan ?"),
+                message: t("La génération du plan est abandonnée ; vous pourrez la relancer."),
+                confirmLabel: t("Arrêter"),
                 onConfirm: stop,
               })
             }
           >
-            <StopIcon /> Arrêter
+            <StopIcon /> {t("Arrêter")}
           </button>
         </PlanProgress>
       )}
       {(phase === "failed" || phase === "empty") && (
         <PlanProgress
           steps={project.steps}
-          title={phase === "failed" ? "La génération du plan a échoué" : "Le plan n'est pas encore généré"}
+          title={phase === "failed" ? t("La génération du plan a échoué") : t("Le plan n'est pas encore généré")}
           lead={
             phase === "failed"
-              ? "Réessayer relance la génération depuis l'idée."
-              : "L'IA écrit l'idée puis l'histoire ; vous relirez l'histoire avant qu'elle écrive les scènes."
+              ? t("Réessayer relance la génération depuis l'idée.")
+              : t("L'IA écrit l'idée puis l'histoire ; vous relirez l'histoire avant qu'elle écrive les scènes.")
           }
         >
           <button className="btn btn-primary" disabled={locked} onClick={() => flow.generatePlan()}>
-            {phase === "failed" ? "Réessayer" : "Générer le plan"}
+            {phase === "failed" ? t("Réessayer") : t("Générer le plan")}
           </button>
         </PlanProgress>
       )}
@@ -149,10 +150,10 @@ function PlanScreen({ flow, project }: { flow: Flow; project: ProjectDetail }) {
             />
           </div>
           <PlanFoot
-            hint="L'histoire est validée, puis l'IA écrit une scène par beat."
-            label="Écrire les scènes"
+            hint={t("L'histoire est validée, puis l'IA écrit une scène par beat.")}
+            label={t("Écrire les scènes")}
             blocked={locked}
-            dirtyReason={storyDraft.dirty ? "Enregistrez ou annulez vos modifications avant d'écrire les scènes" : null}
+            dirtyReason={storyDraft.dirty ? t("Enregistrez ou annulez vos modifications avant d'écrire les scènes") : null}
             onClick={writeScenes}
           />
         </>
@@ -170,16 +171,16 @@ function PlanScreen({ flow, project }: { flow: Flow; project: ProjectDetail }) {
             />
           </div>
           <PlanFoot
-            hint="Relisez les scènes et le casting avant de lancer la génération."
-            label="Valider le plan et générer"
+            hint={t("Relisez les scènes et le casting avant de lancer la génération.")}
+            label={t("Valider le plan et générer")}
             blocked={locked}
-            dirtyReason={draft.dirty ? "Enregistrez ou annulez vos modifications avant de valider" : null}
+            dirtyReason={draft.dirty ? t("Enregistrez ou annulez vos modifications avant de valider") : null}
             onClick={() =>
               confirm({
-                title: "Valider le plan et générer ?",
+                title: t("Valider le plan et générer ?"),
                 message:
-                  "Le plan est figé. Les images du casting qui manquent encore sont lancées maintenant ; vous lancerez ensuite les clips, la voix, la musique et le montage depuis la page projet. Les générations payantes comptent dans le budget du projet.",
-                confirmLabel: "Valider et générer",
+                  t("Le plan est figé. Les images du casting qui manquent encore sont lancées maintenant ; vous lancerez ensuite les clips, la voix, la musique et le montage depuis la page projet. Les générations payantes comptent dans le budget du projet."),
+                confirmLabel: t("Valider et générer"),
                 onConfirm: validate,
               })
             }

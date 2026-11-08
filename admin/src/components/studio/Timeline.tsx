@@ -4,6 +4,7 @@ import { clock } from "../../format";
 import { PlusIcon } from "../icons";
 import type { StepName } from "../../steps";
 import { laneState, rulerTicks, shortText, type Block, type LaneState } from "../../studio";
+import { t } from "../../i18n";
 
 interface TimelineProps {
   project: ProjectDetail;
@@ -20,7 +21,7 @@ interface TimelineProps {
 
 const pct = (n: number) => `${n}%`;
 
-const STATE_SUFFIX: Record<LaneState, string> = { ready: "", generating: " : en génération", empty: " : à générer" };
+const STATE_SUFFIX: Record<LaneState, string> = { ready: "", generating: t(" : en génération"), empty: t(" : à générer") };
 
 /** Timeline : règle de temps, pistes Clips, Voix et Musique, tête de lecture. Un bloc par scène, largeur ∝ durée. */
 export default function Timeline({ project, blocks, total, index, time, musicName, onSelect, onSeek, onFill }: TimelineProps) {
@@ -56,12 +57,12 @@ export default function Timeline({ project, blocks, total, index, time, musicNam
   };
 
   return (
-    <section className="timeline" aria-label="Timeline" style={{ "--total-s": total } as CSSProperties}>
+    <section className="timeline" aria-label={t("Timeline")} style={{ "--total-s": total } as CSSProperties}>
       <div className="tl-heads" aria-hidden>
         <span className="tl-head-ruler" />
-        <span className="tl-head lane-clip">Clips</span>
-        <span className="tl-head lane-voice">Voix</span>
-        <span className="tl-head lane-music">Musique</span>
+        <span className="tl-head lane-clip">{t("Clips")}</span>
+        <span className="tl-head lane-voice">{t("Voix")}</span>
+        <span className="tl-head lane-music">{t("Musique")}</span>
       </div>
       <div className="tl-scroll">
         <div className="tl-tracks">
@@ -80,7 +81,7 @@ export default function Timeline({ project, blocks, total, index, time, musicNam
                 i,
                 "clips",
                 laneState(Boolean(clip), clipsRunning),
-                `Scène ${scene.position}, clip`,
+                t("Scène {n}, clip", { n: scene.position }),
                 <>
                   {clip && <video className="tl-thumb" src={`${clip.url}#t=0.5`} muted preload="metadata" tabIndex={-1} />}
                   <span className="tl-num">{scene.position}</span>
@@ -95,7 +96,7 @@ export default function Timeline({ project, blocks, total, index, time, musicNam
                 i,
                 "voice",
                 laneState(Boolean(latestAsset(project.assets, "voice", scene.id)), voiceRunning),
-                `${shortText(scene.voice_text)} (scène ${scene.position}, voix)`,
+                t("{text} (scène {n}, voix)", { text: shortText(scene.voice_text), n: scene.position }),
                 <span className="tl-text">{shortText(scene.voice_text)}</span>,
               ),
             )}
@@ -107,7 +108,7 @@ export default function Timeline({ project, blocks, total, index, time, musicNam
                 <span className="tl-text">{musicName}</span>
               </span>
             ) : (
-              <span className="tl-none">Sans musique</span>
+              <span className="tl-none">{t("Sans musique")}</span>
             )}
           </div>
 

@@ -2,6 +2,7 @@ import type { Scene } from "../../api";
 import { clock } from "../../format";
 import type { Player } from "../../hooks/usePlayer";
 import { MicIcon, PauseIcon, PlayIcon, RefreshIcon } from "../icons";
+import { t } from "../../i18n";
 
 /** Aperçu 9:16 : le rendu final s'il existe, sinon le clip choisi de la scène avec sa voix et son texte en sous-titre. */
 export default function Preview({
@@ -30,9 +31,9 @@ export default function Preview({
 }) {
   const { video, audio, musicAudio, playing, time, toggle, handlers } = player;
   const src = render ?? clip;
-  const caption = render ? "Rendu final" : scene ? `Scène ${scene.position}` : "Aperçu";
+  const caption = render ? t("Rendu final") : scene ? t("Scène {n}", { n: scene.position }) : t("Aperçu");
   return (
-    <main className="preview" aria-label="Aperçu">
+    <main className="preview" aria-label={t("Aperçu")}>
       <div className="preview-frame">
         {src ? (
           <video
@@ -42,12 +43,12 @@ export default function Preview({
             preload="auto"
             muted={!render} // les clips sont muets : la voix joue à côté
             onClick={toggle}
-            aria-label={render ? "Rendu de la vidéo" : `Clip de la scène ${scene?.position}`}
+            aria-label={render ? t("Rendu de la vidéo") : t("Clip de la scène {n}", { n: scene?.position ?? "" })}
             {...handlers}
           />
         ) : (
           <p className="preview-empty">
-            {scene ? `Pas encore de clip pour la scène ${scene.position}.` : "L'aperçu apparaît dès que les clips sont générés."}
+            {scene ? t("Pas encore de clip pour la scène {n}.", { n: scene.position }) : t("L'aperçu apparaît dès que les clips sont générés.")}
           </p>
         )}
         {!render && voice && <audio ref={audio} src={voice} preload="auto" />}
@@ -59,7 +60,7 @@ export default function Preview({
           className="play"
           onClick={toggle}
           disabled={!src}
-          aria-label={playing ? "Pause (espace)" : "Lecture (espace)"}
+          aria-label={playing ? t("Pause (espace)") : t("Lecture (espace)")}
         >
           {playing ? <PauseIcon /> : <PlayIcon />}
         </button>
@@ -69,15 +70,15 @@ export default function Preview({
         <span className="transport-caption muted">{caption}</span>
       </div>
       {scene && (
-        <div className="scene-actions" role="group" aria-label={`Modifier la scène ${scene.position}`}>
+        <div className="scene-actions" role="group" aria-label={t("Modifier la scène {n}", { n: scene.position })}>
           <button className="btn" onClick={onEditClip}>
             <RefreshIcon />
             <span>
-              Régénérer le clip<span className="hide-narrow"> de la scène {scene.position}</span>
+              {t("Régénérer le clip")}<span className="hide-narrow"> {t("de la scène {n}", { n: scene.position })}</span>
             </span>
           </button>
           <button className="btn" onClick={onEditVoice}>
-            <MicIcon /> Régénérer la voix
+            <MicIcon /> {t("Régénérer la voix")}
           </button>
         </div>
       )}

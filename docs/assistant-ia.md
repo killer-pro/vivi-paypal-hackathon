@@ -21,7 +21,7 @@ proposition » rétablit le texte précédent.
 
 ## Règles de composition du prompt visuel
 Issues du benchmark des profils de génération (`docs/profils-generation.md`) et incluses dans `VISUAL_PROMPT_GUIDE`
-(`services/pipeline.py`), donc appliquées à la fois par l'étape script (génération initiale des scènes) et par
+(`services/prompts.py`), donc appliquées à la fois par l'étape script (génération initiale des scènes) et par
 l'assistant (`visual_prompt`) :
 - un sujet de taille modérée avec de la marge autour, jamais un sujet qui remplit le conteneur ;
 - une action décrite par ce qu'on voit (« un bras pousse le dessous du couvercle »), pas par un verbe abstrait

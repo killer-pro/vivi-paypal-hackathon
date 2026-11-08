@@ -1,5 +1,6 @@
 import type { ProjectCard } from "./api";
 import { STATUS_LABELS, STEP_LABELS, STEP_ORDER, type StepStatus } from "./steps";
+import { t } from "./i18n";
 
 export type Segment = "done" | "current" | "todo";
 
@@ -13,12 +14,12 @@ export function progress(current: ProjectCard["current_step"]): Segment[] {
 export function cardState(
   p: Pick<ProjectCard, "status" | "autopilot" | "current_step" | "current_status">,
 ): { tone: StepStatus; label: string; live?: true } {
-  if (p.status === "done" || !p.current_step) return { tone: "approved", label: "Terminée" };
+  if (p.status === "done" || !p.current_step) return { tone: "approved", label: t("Terminée") };
   const status = p.current_status ?? "pending";
   const step = STEP_LABELS[p.current_step];
-  if (status === "failed") return { tone: "failed", label: `Échec : ${step}` };
-  if (p.autopilot) return { tone: "running", label: "En génération…", live: true };
-  return { tone: status, label: `${STATUS_LABELS[status]} : ${step}` };
+  if (status === "failed") return { tone: "failed", label: t("Échec : {step}", { step }) };
+  if (p.autopilot) return { tone: "running", label: t("En génération…"), live: true };
+  return { tone: status, label: t("{status} : {step}", { status: STATUS_LABELS[status], step }) };
 }
 
 export const PAGE_SIZE = 24;
@@ -26,17 +27,17 @@ export const PAGE_SIZE = 24;
 export const SORTS = ["recent", "oldest", "title", "cost"] as const;
 export type Sort = (typeof SORTS)[number];
 export const SORT_LABELS: Record<Sort, string> = {
-  recent: "Plus récentes",
-  oldest: "Plus anciennes",
-  title: "Titre (A à Z)",
-  cost: "Plus coûteuses",
+  recent: t("Plus récentes"),
+  oldest: t("Plus anciennes"),
+  title: t("Titre (A à Z)"),
+  cost: t("Plus coûteuses"),
 };
 
 export type StatusFilter = "" | "draft" | "done";
 export const STATUS_FILTERS: { value: StatusFilter; label: string }[] = [
-  { value: "", label: "Toutes" },
-  { value: "draft", label: "En cours" },
-  { value: "done", label: "Terminées" },
+  { value: "", label: t("Toutes") },
+  { value: "draft", label: t("En cours") },
+  { value: "done", label: t("Terminées") },
 ];
 
 export interface Library {

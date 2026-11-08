@@ -7,6 +7,7 @@ import ProjectFields from "../ProjectFields";
 import StepPanel, { type PanelProps } from "../StepPanel";
 import TextArea from "../TextArea";
 import { Advanced, FormActions } from "../ui";
+import { t } from "../../i18n";
 
 export default function IdeaPanel(props: PanelProps) {
   const { flow, project, step, locked } = props;
@@ -30,22 +31,22 @@ export default function IdeaPanel(props: PanelProps) {
 
   const angleForm = (
     <form className="form" onSubmit={saveAngle}>
-      <AssistField label="Angle proposé" kind="angle" value={angle.value} onChange={angle.set} unsaved={angle.dirty} {...assist}>
+      <AssistField label={t("Angle proposé")} kind="angle" value={angle.value} onChange={angle.set} unsaved={angle.dirty} {...assist}>
         {(f) => <TextArea {...f} className="input input-tall" value={angle.value} onChange={(e) => angle.set(e.target.value)} />}
       </AssistField>
-      {angle.dirty && <FormActions submitLabel="Enregistrer l'angle" onCancel={angle.reset} disabled={locked} />}
+      {angle.dirty && <FormActions submitLabel={t("Enregistrer l'angle")} onCancel={angle.reset} disabled={locked} />}
     </form>
   );
 
   return (
     <StepPanel
       {...props}
-      runLabel="Développer l'angle"
+      runLabel={t("Développer l'angle")}
       hideRun={settled}
       onRun={() => flow.run("idea", undefined, { params: { hint: hint.value } })}
     >
       <form className="form panel-section" onSubmit={saveBrief}>
-        <h3>Brief</h3>
+        <h3>{t("Brief")}</h3>
         <ProjectFields
           value={brief.value}
           onChange={brief.update}
@@ -54,17 +55,17 @@ export default function IdeaPanel(props: PanelProps) {
           unsaved={brief.dirty}
           foldTheme={settled}
         />
-        {brief.dirty && <FormActions submitLabel="Enregistrer le brief" onCancel={brief.reset} disabled={locked} />}
+        {brief.dirty && <FormActions submitLabel={t("Enregistrer le brief")} onCancel={brief.reset} disabled={locked} />}
       </form>
 
       {!settled && (
         <div className="form panel-section">
-          <AssistField label="Piste de départ (facultatif)" kind="hint" value={hint.value} onChange={hint.set} unsaved={hint.dirty} {...assist}>
+          <AssistField label={t("Piste de départ (facultatif)")} kind="hint" value={hint.value} onChange={hint.set} unsaved={hint.dirty} {...assist}>
             {(f) => (
               <TextArea
                 {...f}
                 className="input"
-                placeholder="Ex. partir d'une erreur que tout le monde fait"
+                placeholder={t("Ex. partir d'une erreur que tout le monde fait")}
                 value={hint.value}
                 onChange={(e) => hint.set(e.target.value)}
               />
@@ -73,7 +74,7 @@ export default function IdeaPanel(props: PanelProps) {
         </div>
       )}
 
-      {hasResult(step) && (settled ? <Advanced label="Angle retenu">{angleForm}</Advanced> : <div className="panel-section">{angleForm}</div>)}
+      {hasResult(step) && (settled ? <Advanced label={t("Angle retenu")}>{angleForm}</Advanced> : <div className="panel-section">{angleForm}</div>)}
     </StepPanel>
   );
 }

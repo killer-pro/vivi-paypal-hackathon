@@ -8,7 +8,9 @@ lancée dans l'ordre dès que plus rien ne la bloque. Comme la file de ComfyUI, 
   dépend (`dependents`, `app/state.py` : relancer le script pendant un montage). Voix et clips ne se bloquent pas : ils
   tournent en parallèle (le worker traite 2 jobs à la fois). Les clips attendent aussi la fin des images de référence
   (étape amont) : ils les lisent au démarrage et partiraient sinon sans elles.
-- Maximum 5 demandes par projet ; la sixième reçoit `409 « File d'attente pleine »`. Une demande identique à une demande
+- Taille de la file fixée par le **forfait du propriétaire du projet** (`perks.queue_max` : Gratuit 1, Starter 2, Créateur 4, Pro 8 ;
+  admin illimité, `docs/abonnement.md`) ; la demande suivante reçoit `409 « File d'attente pleine : … »` suivi du motif de limite
+  (« Limite de votre forfait : 1 demande en file (forfait Starter : 2 demandes en file) »). Une demande identique à une demande
   déjà en file n'est pas répétée.
 - Relancer l'étape entière pendant qu'elle tourne reste un `409` (rien à attendre) ; un seul élément de référence (`reference_id`) se met en file.
 - Les paramètres de l'étape reference (`params` : prompts, générateur) voyagent avec la demande et sont appliqués au démarrage : le `PATCH` des paramètres est refusé pendant que l'étape tourne.

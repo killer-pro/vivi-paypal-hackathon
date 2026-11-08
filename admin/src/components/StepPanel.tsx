@@ -19,9 +19,10 @@ import GenerationTiming from "./GenerationTiming";
 import PriceNote from "./PriceNote";
 import { StopIcon } from "./icons";
 import { useConfirm } from "../hooks/useConfirm";
+import { t } from "../i18n";
 
-const REGENERATE_ALL_HINT = "Refait toutes les scènes (nouveaux appels payants)";
-const STALE_HINT = "Une étape précédente a changé depuis ce résultat : régénérez-le, ou validez-le tel quel s'il convient toujours.";
+const REGENERATE_ALL_HINT = t("Refait toutes les scènes (nouveaux appels payants)");
+const STALE_HINT = t("Une étape précédente a changé depuis ce résultat : régénérez-le, ou validez-le tel quel s'il convient toujours.");
 
 /** Ce que chaque panneau d'étape reçoit de l'éditeur. */
 export interface PanelProps {
@@ -83,7 +84,7 @@ export default function StepPanel({
   onRun = () => flow.run(step.name),
   onResume = () => flow.run(step.name, undefined, { overrides: { resume: true } }),
   onRetryScene = (sceneId) => flow.run(step.name, sceneId),
-  approveLabel = "Valider",
+  approveLabel = t("Valider"),
   approveBlocked,
   runBlocked,
   confirmRun,
@@ -95,21 +96,21 @@ export default function StepPanel({
   const { canRun, canApprove, showRetry, stale } = availableActions(step, previousApproved);
   const running = step.status === "running";
   const { confirm, dialog } = useConfirm();
-  const label = runLabel ?? (hasResult(step) ? "Régénérer" : "Générer");
+  const label = runLabel ?? (hasResult(step) ? t("Régénérer") : t("Générer"));
   const requestRun = () => {
     if (!hasResult(step)) return onRun();
     const redo = affectedDownstream(project.steps, step.name).map((n) => STEP_LABELS[n]);
     const message = [
-      confirmRun ?? "Le résultat actuel sera remplacé.",
-      redo.length > 0 && `À refaire ensuite : ${redo.join(", ")}.`,
+      confirmRun ?? t("Le résultat actuel sera remplacé."),
+      redo.length > 0 && t("À refaire ensuite : {list}.", { list: redo.join(", ") }),
     ];
     confirm({ title: `${label} ?`, message: message.filter(Boolean).join(" "), confirmLabel: label, onConfirm: onRun });
   };
   const requestStop = () =>
     confirm({
-      title: "Arrêter la génération ?",
-      message: "Ce qui est en cours est abandonné ; les éléments déjà générés restent disponibles.",
-      confirmLabel: "Arrêter",
+      title: t("Arrêter la génération ?"),
+      message: t("Ce qui est en cours est abandonné ; les éléments déjà générés restent disponibles."),
+      confirmLabel: t("Arrêter"),
       onConfirm: () => flow.cancel(step.name),
     });
   const error = flow.actionError?.scope === step.name ? flow.actionError.message : null;
@@ -140,7 +141,7 @@ export default function StepPanel({
             <GenerationTiming step={step} />
           </div>
           <button className="btn btn-small btn-ghost" onClick={requestStop} disabled={flow.busy}>
-            <StopIcon /> Arrêter
+            <StopIcon /> {t("Arrêter")}
           </button>
           <div
             className={step.progress && !step.target_scene ? "generation-bar" : "generation-bar is-indeterminate"}
@@ -158,7 +159,7 @@ export default function StepPanel({
       {step.status === "failed" && (
         <div className="notice" role="alert">
           <p>
-            <strong>{stopped ? "Génération arrêtée." : "La génération a échoué."}</strong> {!stopped && step.error}
+            <strong>{stopped ? t("Génération arrêtée.") : t("La génération a échoué.")}</strong> {!stopped && step.error}
           </p>
           {showRetry && runBlocked && <p className="muted">{runBlocked}</p>}
           {showRetry && failedScene && (
@@ -167,13 +168,13 @@ export default function StepPanel({
                 className="btn btn-primary"
                 onClick={() => onRetryScene(failedScene.id)}
                 disabled={runLocked || Boolean(runBlocked)}
-                title="Ne refait que cette scène, les autres ne sont pas touchées"
+                title={t("Ne refait que cette scène, les autres ne sont pas touchées")}
               >
-                {priceLabel(`Relancer la scène ${failedScene.position}`, scenePrice)}
+                {priceLabel(t("Relancer la scène {n}", { n: failedScene.position }), scenePrice)}
               </button>
               <PriceNote quote={scenePrice} />
               <button className="btn" onClick={requestRun} disabled={runLocked || Boolean(runBlocked)} title={REGENERATE_ALL_HINT}>
-                Tout régénérer
+                {t("Tout régénérer")}
               </button>
             </>
           )}
@@ -184,13 +185,13 @@ export default function StepPanel({
                 className="btn btn-primary"
                 onClick={onResume}
                 disabled={runLocked || Boolean(runBlocked)}
-                title="Ne génère que les scènes manquantes"
+                title={t("Ne génère que les scènes manquantes")}
               >
                 {priceLabel(`Reprendre (${resume.remaining} restante${resume.remaining > 1 ? "s" : ""})`, resumePrice)}
               </button>
               <PriceNote quote={resumePrice} />
               <button className="btn" onClick={requestRun} disabled={runLocked || Boolean(runBlocked)} title={REGENERATE_ALL_HINT}>
-                Tout régénérer
+                {t("Tout régénérer")}
               </button>
             </>
           )}

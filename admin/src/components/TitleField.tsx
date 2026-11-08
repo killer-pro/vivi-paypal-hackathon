@@ -1,4 +1,5 @@
 import { useDraft } from "../hooks/useDraft";
+import { t } from "../i18n";
 
 /** Titre éditable en place : Entrée ou sortie du champ enregistre, Échap annule ; un titre vide est refusé. */
 export default function TitleField({ title, onRename, locked }: { title: string; onRename: (t: string) => Promise<boolean>; locked: boolean }) {
@@ -11,7 +12,7 @@ export default function TitleField({ title, onRename, locked }: { title: string;
   return (
     <input
       className="title-field"
-      aria-label="Titre du projet"
+      aria-label={t("Titre du projet")}
       maxLength={200}
       value={draft.value}
       readOnly={locked}

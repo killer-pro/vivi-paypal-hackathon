@@ -4,6 +4,7 @@ import { useNow } from "../hooks/useNow";
 import type { Step } from "../steps";
 import { generationTiming } from "../studio";
 import { UnitSecondsContext } from "./unitSeconds";
+import { t } from "../i18n";
 
 /** Temps restant arrondi à l'excès (5 s, puis 30 s au-delà de 5 min) : le chiffre ne saute pas à chaque seconde. */
 const rounded = (seconds: number) => Math.ceil(seconds / (seconds > 300 ? 30 : 5)) * (seconds > 300 ? 30 : 5);
@@ -17,7 +18,7 @@ export default function GenerationTiming({ step }: { step: Step }) {
   return (
     <span className="timing">
       <span>{durationText(elapsed)} écoulées</span>
-      {remaining !== null && <span>{remaining > 0 ? `≈ ${durationText(rounded(remaining))} restantes` : "plus long que prévu"}</span>}
+      {remaining !== null && <span>{remaining > 0 ? t("≈ {time} restantes", { time: durationText(rounded(remaining)) }) : t("plus long que prévu")}</span>}
     </span>
   );
 }

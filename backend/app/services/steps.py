@@ -4,6 +4,7 @@ Toute action qui lance une étape ou change le drapeau autopilot verrouille d'ab
 (`SELECT … FOR UPDATE`) : lancements, chaînage du worker et arrêt de l'autopilot sont ainsi sérialisés par projet.
 Les refus sont des `HTTPException` (409/404/503) : l'API les renvoie tels quels, le worker arrête l'autopilot.
 """
+import math
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from uuid import uuid4
@@ -19,6 +20,7 @@ from app.providers.registry import ProviderRegistry
 from app.services import access, credits
 from app.services.access import SubscriptionRequired
 from app.services.budget import PAID_STEPS, BudgetExceeded, clip_scene_costs_usd, ensure_within_budget
+from app.services.choices import clip_model, clip_provider_name, reference_choice, start_image_provider
 from app.services.credits import CreditsRefused
 from app.services.flow import (
     COMPLETED,
@@ -29,11 +31,14 @@ from app.services.flow import (
     latest_by_scene,
     load_steps,
     mark_stale,
+    reference_elements,
+    references_to_make,
     scene_run_id,
     sync_status,
 )
-from app.services.pipeline import clip_model, clip_provider_name, job_timeout, reference_choice, start_image_provider
 from app.services.pricing import Pricing, load_pricing
+from app.services.script_parsing import DURATION_TOLERANCE
+from app.services.timeouts import job_timeout
 from app.services.video_models import ModelRefused, ensure_clip_model_usable, ensure_image_model_usable
 from app.state import OPTIONAL_STEPS, STEP_NAMES, can_start, dependents, downstream
 
@@ -92,12 +97,13 @@ async def _check_clips(session: AsyncSession, app_settings: AppSettings, owner: 
                                                     skip_scene_ids, image_usd, pricing)
 
 
-async def _check_reference(app_settings: AppSettings, params: dict) -> None:
-    """Modèle d'image de l'étape reference utilisable : `ModelRefused` (400 inconnu, 409 indisponible, ex. clé Gemini
-    ou fal manquante) avant de réclamer l'étape, plutôt qu'un échec tardif dans le worker."""
+async def _check_reference(app_settings: AppSettings, params: dict) -> str:
+    """Modèle d'image de l'étape reference utilisable, et son provider : `ModelRefused` (400 inconnu, 409 indisponible,
+    ex. clé Gemini ou fal manquante) avant de réclamer l'étape, plutôt qu'un échec tardif dans le worker."""
     provider, model = await reference_choice(params, app_settings)
     async with ProviderRegistry(app_settings) as registry:
         await ensure_image_model_usable(registry, provider, model)
+    return provider
 
 
 async def _scene_to_reprompt(session: AsyncSession, project_id: int, name: str, scene_id: int | None,
@@ -168,7 +174,7 @@ class Launch:
     scene: Scene | None
     overrides: dict | None
     done: dict[int, int]
-    provider: str | None
+    provider: str | None  # provider vidéo (clips) ou d'image (reference), qui fixe les timeouts
     quote: Quote
 
     @property
@@ -189,6 +195,34 @@ async def _quote(session: AsyncSession, pricing: Pricing, project_id: int, name:
         prices = {sid: pricing.action_credits("voice") for sid in (await session.scalars(query)).all()}
         return Quote(sum(prices.values()), prices)
     return Quote(pricing.action_credits(name) if name in pricing.flat_usd else 0)
+
+
+def _script_elements(steps: list[Step]) -> list[dict]:
+    return (next(s for s in steps if s.name == "script").result or {}).get("references") or []
+
+
+async def _references_wanted(session: AsyncSession, project_id: int, steps: list[Step], overrides: dict | None) -> int:
+    """Éléments de référence du projet une fois le lancement fait : un élément seul s'ajoute à ceux qui ont déjà une
+    image ; sinon les éléments générés (une image du projet sans élément)."""
+    if reference_id := (overrides or {}).get("reference_id"):
+        return len(await reference_elements(session, project_id) | {reference_id})
+    return max(len(references_to_make(_script_elements(steps), overrides)), 1)
+
+
+async def _references_allowed(session: AsyncSession, project: Project, steps: list[Step]) -> dict | None:
+    """Autopilot et lancement automatique : seulement les premiers éléments que le forfait du propriétaire permet, au
+    lieu d'un refus (`None` : tous)."""
+    owner = await session.get(User, project.user_id)
+    assert owner is not None
+    elements, allowed = _script_elements(steps), (await access.perks_for(AppSettings(session), owner)).references_max
+    return {"reference_ids": [e["id"] for e in elements[:allowed]]} if len(elements) > allowed else None
+
+
+async def _ensure_video_length(session: AsyncSession, app_settings: AppSettings, owner: User, project_id: int) -> None:
+    """403 si les scènes dépassent la durée maximale du forfait, au-delà de l'écart toléré d'un script généré."""
+    total = await session.scalar(select(func.sum(Scene.duration_s)).where(Scene.project_id == project_id)) or 0
+    if total > (await access.perks_for(app_settings, owner)).max_duration_s * (1 + DURATION_TOLERANCE):
+        await access.require_limit(app_settings, owner, "max_duration_s", math.ceil(total))
 
 
 async def preflight_launch(session: AsyncSession, project_id: int, name: str, scene_id: int | None = None,
@@ -213,16 +247,18 @@ async def preflight_launch(session: AsyncSession, project_id: int, name: str, sc
     app_settings = AppSettings(session)
     owner = await session.get(User, project.user_id)
     assert owner is not None
-    if name == "reference":
-        await access.require(app_settings, owner, "reference")
     pricing = None if owner.is_admin else await load_pricing(app_settings)
     provider: str | None = None
     clip_costs: dict[int, float] = {}
     if name == "clips":
         provider, clip_costs = await _check_clips(session, app_settings, owner, project_id, {**step.params, **(overrides or {})},
                                                   scene_id, frozenset(done), pricing)
-    elif name == "reference":
-        await _check_reference(app_settings, {**step.params, **(params or {})})
+    if name in ("clips", "voice"):  # ce qui est réellement généré (plan chat, script modifié) : pas seulement le brief
+        await _ensure_video_length(session, app_settings, owner, project_id)
+    if name == "reference":
+        provider = await _check_reference(app_settings, {**step.params, **(params or {})})
+        await access.require_limit(app_settings, owner, "references_max",
+                                   await _references_wanted(session, project_id, steps, overrides))
     quote = Quote()
     if pricing is None:  # budget en dollars : projets de l'admin seulement ; pour un client, les crédits font office de budget
         if name in PAID_STEPS:
@@ -244,7 +280,7 @@ async def _reserve_credits(session: AsyncSession, launch: Launch, name: str, run
             select(func.count()).select_from(Step).join(Project, Project.id == Step.project_id)
             .where(Project.user_id == owner.id, Step.name == "clips", Step.status == "running",
                    Step.project_id != launch.project.id))
-        if (running or 0) >= int(await AppSettings(session).get("credits_max_parallel_clips")):
+        if (running or 0) >= (await access.perks_for(AppSettings(session), owner)).parallel_clips:
             await session.rollback()
             raise credits.ParallelLimit()
     if launch.quote.credits == 0:
@@ -290,7 +326,10 @@ async def launch_step(session: AsyncSession, project_id: int, name: str, enqueue
     mark_stale(steps, dependents(name))
     await sync_status(session, project_id, steps)
     await session.commit()
-    total = scene_id and 1 or await session.scalar(select(func.count()).select_from(Scene).where(Scene.project_id == project_id)) or 0
+    if name == "reference":  # un appel par élément récurrent généré
+        total = len(references_to_make(_script_elements(steps), overrides))
+    else:
+        total = scene_id and 1 or await session.scalar(select(func.count()).select_from(Scene).where(Scene.project_id == project_id)) or 0
     try:
         await enqueue(project_id, name, scene_id, overrides or None,
                       timeout=job_timeout(name, max(total - len(done), 1), launch.provider))
@@ -367,7 +406,8 @@ async def start_reference_after_script(session: AsyncSession, project_id: int, e
         await session.rollback()
         return False
     try:
-        await launch_step(session, project_id, "reference", enqueue)
+        await launch_step(session, project_id, "reference", enqueue,
+                          overrides=await _references_allowed(session, project, list(by_name.values())))
     except HTTPException:
         await session.rollback()  # libère le verrou du projet
         return False
@@ -404,10 +444,7 @@ async def advance(session: AsyncSession, project_id: int, step_name: str, enqueu
         return
     step.status = "approved"  # déjà validée à la main : la suite n'a peut-être pas été lancée
     following = downstream(step_name)
-    owner = await session.get(User, project.user_id)
-    can_reference = owner is not None and await access.reason(AppSettings(session), owner, "reference") is None
-    # éléments récurrents à garder identiques ; sans abonnement, l'étape reference est ignorée (elle est réservée)
-    wants_references = can_reference and bool((by_name["script"].result or {}).get("references"))
+    wants_references = bool((by_name["script"].result or {}).get("references"))  # éléments récurrents à garder identiques
     while following and following[0] in OPTIONAL_STEPS and not (following[0] == "reference" and wants_references):
         by_name[following.pop(0)].status = "approved"
     while following and by_name[following[0]].status == "approved":  # voix ou musique déjà validées à la main
@@ -426,8 +463,9 @@ async def advance(session: AsyncSession, project_id: int, step_name: str, enqueu
     if name == "music" and music.params.get("track_id") is None and (track_id := await _first_track_id(session)):
         music.params = {**music.params, "track_id": track_id}
     await session.flush()
+    overrides = await _references_allowed(session, project, steps) if name == "reference" else None
     try:
-        await launch_step(session, project_id, name, enqueue)
+        await launch_step(session, project_id, name, enqueue, overrides=overrides)
     except (BudgetExceeded, ModelRefused, CreditsRefused, SubscriptionRequired) as e:
         # l'échec et sa raison apparaissent sur l'étape, relançable une fois le budget relevé ou le modèle disponible
         by_name[name].status, by_name[name].error = "failed", e.detail

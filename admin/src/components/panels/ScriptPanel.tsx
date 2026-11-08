@@ -8,6 +8,7 @@ import SceneCard from "../SceneCard";
 import StepPanel, { type PanelProps } from "../StepPanel";
 import { Field, FormActions } from "../ui";
 import TextArea from "../TextArea";
+import { locale, t, tn } from "../../i18n";
 
 export default function ScriptPanel(props: PanelProps) {
   const { flow, project, step, locked, scene } = props;
@@ -30,23 +31,22 @@ export default function ScriptPanel(props: PanelProps) {
   return (
     <StepPanel
       {...props}
-      runLabel={hasResult(step) ? "Régénérer le script" : "Générer le script"}
+      runLabel={hasResult(step) ? t("Régénérer le script") : t("Générer le script")}
       onRun={() =>
         flow.run("script", undefined, { overrides: instruction.trim() ? { instruction: instruction.trim() } : undefined })
       }
       runBlocked={
-        dirty ? "Enregistrez ou annulez vos modifications avant de générer un nouveau script." : undefined
+        dirty ? t("Enregistrez ou annulez vos modifications avant de générer un nouveau script.") : undefined
       }
-      confirmRun="Le script actuel sera remplacé par un nouveau découpage : les scènes, leurs textes et les clips choisis pour le montage seront perdus."
+      confirmRun={t("Le script actuel sera remplacé par un nouveau découpage : les scènes, leurs textes et les clips choisis pour le montage seront perdus.")}
     >
       <form className="form" onSubmit={save}>
         <CastStrip cast={cast} flow={flow} />
         <p className="muted">
-          {list.length} scène{list.length > 1 ? "s" : ""}, {total.toLocaleString("fr-FR")} s sur{" "}
-          {project.target_duration_s} s visées
+          {tn(list.length, "{n} scène", "{n} scènes")}, {total.toLocaleString(locale)} s {t("sur")} {project.target_duration_s} s {t("visées")}
         </p>
         <AssistField
-          label="Fiche visuelle (personnages, marques, décor, style)"
+          label={t("Fiche visuelle (personnages, marques, décor, style)")}
           kind="bible"
           value={bible.value}
           onChange={bible.set}
@@ -60,18 +60,18 @@ export default function ScriptPanel(props: PanelProps) {
               {...f}
               className="input"
               rows={6}
-              placeholder="Rédigée par l'IA au moment du script : elle fixe l'apparence des personnages et des marques, que chaque prompt visuel reprend à l'identique."
+              placeholder={t("Rédigée par l'IA au moment du script : elle fixe l'apparence des personnages et des marques, que chaque prompt visuel reprend à l'identique.")}
               value={bible.value}
               onChange={(e) => bible.set(e.target.value)}
             />
           )}
         </AssistField>
-        <Field label="Consigne pour régénérer le plan (facultatif)">
+        <Field label={t("Consigne pour régénérer le plan (facultatif)")}>
           <TextArea
             className="input"
             rows={2}
             maxLength={1000}
-            placeholder="Ex. : plus d'action, ajoute le logo Coca-Cola dès la première scène, ton plus humoristique."
+            placeholder={t("Ex. : plus d'action, ajoute le logo Coca-Cola dès la première scène, ton plus humoristique.")}
             value={instruction}
             onChange={(e) => setInstruction(e.target.value)}
           />
@@ -98,7 +98,7 @@ export default function ScriptPanel(props: PanelProps) {
         </ol>
         <div>
           <button type="button" className="btn" onClick={draft.add}>
-            Ajouter une scène
+            {t("Ajouter une scène")}
           </button>
         </div>
         {dirty && blank >= 0 && (
@@ -108,7 +108,7 @@ export default function ScriptPanel(props: PanelProps) {
         )}
         {dirty && (
           <FormActions
-            submitLabel="Enregistrer le plan"
+            submitLabel={t("Enregistrer le plan")}
             onCancel={draft.reset}
             disabled={locked || blank >= 0}
           />

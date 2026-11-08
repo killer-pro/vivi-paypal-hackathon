@@ -1,18 +1,21 @@
 import json
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import pytest
 from sqlalchemy import select
 
-from app.models import CreditEntry, CreditReservation, Project, Scene, Step
+from app.app_settings import AppSettings
+from app.models import Asset, CreditEntry, CreditReservation, Project, Scene, Step
+from app.providers.comfycloud import cloud_clip_usd
 from app.services import credits, steps
 from app.services.flow import StepBusy
-from app.services.pricing import DEFAULT_PRICING, Pricing
+from app.services.pricing import DEFAULT_PRICING, Pricing, load_pricing
 from tests.test_api_steps import new_project, set_status
 
-PRICING = Pricing.from_json(json.loads(DEFAULT_PRICING), usd_per_credit=Decimal("0.05"),
-                            margin=Decimal("2.5"))
-CLIP_3S = PRICING.clip_credits(PRICING.local_clip_cost_usd("fast", 3))  # 3 crédits : 0,048 $ × 2,5 ÷ 0,05 = 2,4
+PRICING = Pricing.from_json(json.loads(DEFAULT_PRICING), usd_per_credit=Decimal("0.01"),
+                            margin=Decimal("3"))
+CLIP_3S = PRICING.clip_credits(PRICING.local_clip_cost_usd("fast", 3))  # 15 crédits : 0,048 $ × 3 ÷ 0,01 = 14,4
 
 
 async def client_project(api_as, make_user, fund, amount=1000, email="c@x.fr"):
@@ -158,6 +161,17 @@ async def test_second_clips_run_refused_by_parallel_limit(api_as, make_user, fun
     assert (await credits.balance(session, uid)).total == before and len(c.enqueued) == 1
 
 
+async def test_creator_runs_two_clip_jobs_in_parallel(api_as, make_user, fund, session):
+    user, c, first = await client_project(api_as, make_user, fund)
+    user.subscription_ends_at, user.plan_id = datetime.now(UTC) + timedelta(days=5), "creator"
+    await session.commit()
+    pids = [first, await new_project(c), await new_project(c)]
+    for pid in pids:
+        await add_scenes(session, pid, 1)
+        await set_status(session, ["idea", "story", "script", "reference"], "approved")
+    assert [(await c.post(f"/api/projects/{pid}/steps/clips/run", json={})).status_code for pid in pids] == [202, 202, 409]
+
+
 async def test_autopilot_stops_with_reason_on_insufficient_credits(api_as, make_user, fund, session):
     user, c, pid = await client_project(api_as, make_user, fund, amount=0)
     await set_status(session, ["idea"], "awaiting_validation")
@@ -177,7 +191,6 @@ async def test_autopilot_stops_with_reason_on_insufficient_credits(api_as, make_
 
 
 async def test_clips_reservation_is_sum_of_missing_scenes_only(api_as, make_user, fund, session):
-    from app.models import Asset
     user, c, pid = await client_project(api_as, make_user, fund)
     ids = await add_scenes(session, pid, 3)
     await set_status(session, ["idea", "story", "script", "reference"], "approved")
@@ -209,3 +222,18 @@ async def test_price_endpoint_has_no_side_effect(api_as, make_user, fund, sessio
     await c.post(f"/api/projects/{pid}/steps/idea/price", json={})
     assert await movements(session) == [] and c.enqueued == []
     assert (await session.scalar(select(Step.status).where(Step.project_id == pid, Step.name == "idea"))) == "pending"
+
+
+async def test_cloud_clip_quote_equals_reservation(api_as, make_user, fund, session):
+    user, c, pid = await client_project(api_as, make_user, fund)
+    await add_scenes(session, pid, 3)
+    await set_status(session, ["idea", "story", "script", "reference"], "approved")
+    session.add(Asset(project_id=pid, kind="reference", key="ref.png", content_type="image/png"))
+    await session.commit()
+    body = {"provider": "comfycloud", "model": "fast"}
+    price = (await c.post(f"/api/projects/{pid}/steps/clips/price", json=body)).json()
+    pricing = await load_pricing(AppSettings(session))
+    assert price["credits"] == 3 * pricing.clip_credits(cloud_clip_usd("fast", 3))  # image de départ Kontext comprise
+    assert (await c.post(f"/api/projects/{pid}/steps/clips/run", json=body)).status_code == 202
+    reservation = (await session.scalars(select(CreditReservation))).one()
+    assert reservation.amount == price["credits"]

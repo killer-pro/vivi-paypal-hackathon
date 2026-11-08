@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Step } from "../../steps";
 import { TOOL_STATE_LABELS, TOOLS, toolState, type Tool, type ToolId, type ToolState } from "../../studio";
+import { t } from "../../i18n";
 
 /** Couleur de la pastille : classe de statut `.st-*` (voir index.css). */
 const TONE: Record<ToolState, Step["status"]> = {
@@ -28,7 +29,7 @@ export default function Pipeline({
   }, [selected]);
 
   return (
-    <nav className="pipeline" aria-label="Étapes de la vidéo" ref={nav}>
+    <nav className="pipeline" aria-label={t("Étapes de la vidéo")} ref={nav}>
       <ol>
         {TOOLS.map((tool) => {
           const state = toolState(tool, steps);

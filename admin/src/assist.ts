@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { t } from "./i18n";
 
 /** Champs que l'assistant IA sait rédiger (miroir de `FIELD_KINDS` côté API). */
 export type AssistKind =
@@ -18,15 +19,15 @@ export type AssistMode = "generate" | "rewrite";
 
 /** Nom court de chaque champ (libellés accessibles des boutons, journal des coûts). */
 export const ASSIST_LABELS: Record<AssistKind, string> = {
-  project_title: "titre du projet",
-  theme: "thème",
-  hint: "piste de départ",
+  project_title: t("titre du projet"),
+  theme: t("thème"),
+  hint: t("piste de départ"),
   angle: "angle",
   bible: "fiche visuelle",
   voice_text: "voix off",
   visual_prompt: "prompt visuel",
-  reference_prompt: "prompt de l'image",
-  title: "titre de publication",
+  reference_prompt: t("prompt de l'image"),
+  title: t("titre de publication"),
   description: "description",
   hashtags: "hashtags",
 };
@@ -77,9 +78,9 @@ export function assistBody(
 
 /** Raison pour laquelle un bouton de l'assistant est inactif (affichée en infobulle), ou `null`. */
 export function assistBlocked(mode: AssistMode, text: string, locked: boolean, loading: boolean): string | null {
-  if (loading) return "Proposition en cours";
-  if (locked) return "Indisponible pendant une génération ou un enregistrement";
-  if (mode === "rewrite" && !text.trim()) return "Saisissez d'abord un texte à reformuler";
+  if (loading) return t("Proposition en cours");
+  if (locked) return t("Indisponible pendant une génération ou un enregistrement");
+  if (mode === "rewrite" && !text.trim()) return t("Saisissez d'abord un texte à reformuler");
   return null;
 }
 

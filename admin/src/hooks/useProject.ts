@@ -6,6 +6,12 @@ import type { StepName } from "../steps";
 
 const RUNNING_REFRESH_MS = 5000;
 
+const formOf = (fields: Record<string, string | Blob>) => {
+  const form = new FormData();
+  for (const [key, value] of Object.entries(fields)) form.append(key, value);
+  return form;
+};
+
 /** Où s'affiche l'erreur d'une action : le panneau d'une étape, ou l'en-tête de l'éditeur (`studio`). */
 export type ActionScope = StepName | "studio";
 
@@ -51,7 +57,9 @@ export function useProject(id: number) {
       setBusy(true);
       setActionError(null);
       try {
-        await api(`${base}${path}`, { method, body: body === undefined ? undefined : JSON.stringify(body) });
+        // Un FormData (envoi de fichier) part tel quel ; le reste en JSON.
+        const payload = body === undefined || body instanceof FormData ? body : JSON.stringify(body);
+        await api(`${base}${path}`, { method, body: payload });
         return true;
       } catch (err) {
         setActionError({ scope, message: errorMessage(err) });
@@ -112,51 +120,9 @@ export function useProject(id: number) {
     setSceneContinuity: (sceneId: number, continuity: "cut" | "continue") =>
       act("clips", `/scenes/${sceneId}/continuity`, "PUT", { continuity }),
     deleteAsset: (assetId: number) => act("clips", `/assets/${assetId}`, "DELETE"),
-    uploadClip: useCallback(
-      async (sceneId: number, file: File): Promise<boolean> => {
-        if (inFlight.current) return false;
-        inFlight.current = true;
-        setBusy(true);
-        setActionError(null);
-        try {
-          const form = new FormData();
-          form.append("file", file);
-          await api(`${base}/scenes/${sceneId}/upload-clip`, { method: "POST", body: form });
-          return true;
-        } catch (err) {
-          setActionError({ scope: "clips", message: errorMessage(err) });
-          return false;
-        } finally {
-          inFlight.current = false;
-          setBusy(false);
-          reload();
-        }
-      },
-      [base, reload],
-    ),
-    uploadReference: useCallback(
-      async (file: File, ref = ""): Promise<boolean> => {
-        if (inFlight.current) return false;
-        inFlight.current = true;
-        setBusy(true);
-        setActionError(null);
-        try {
-          const form = new FormData();
-          form.append("file", file);
-          form.append("ref", ref);
-          await api(`${base}/reference/upload`, { method: "POST", body: form });
-          return true;
-        } catch (err) {
-          setActionError({ scope: "clips", message: errorMessage(err) });
-          return false;
-        } finally {
-          inFlight.current = false;
-          setBusy(false);
-          reload();
-        }
-      },
-      [base, reload],
-    ),
+    uploadClip: (sceneId: number, file: File) =>
+      act("clips", `/scenes/${sceneId}/upload-clip`, "POST", formOf({ file })),
+    uploadReference: (file: File, ref = "") => act("clips", "/reference/upload", "POST", formOf({ file, ref })),
     updateProject: (body: ProjectPatch) => act("idea", "", "PATCH", body),
     rename: (title: string) => act("studio", "", "PATCH", { title }),
     /** Génère (ou régénère) le plan : idée puis script, sans lancer les clips. */

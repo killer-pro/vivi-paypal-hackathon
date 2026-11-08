@@ -9,19 +9,16 @@ from app.config import settings
 from app.models import Asset, MusicTrack, Project, ProviderCall, Scene, Step
 from app.providers.base import GenerationResult, ProviderError, TextResult
 from app.providers.fakes import FakeVideo
-from app.services.pipeline import (
-    CLIP_CONCURRENCY,
+from app.services.pipeline import CLIP_CONCURRENCY, VOICE_CONCURRENCY, run_step
+from app.services.prompts import VISUAL_PROMPT_GUIDE, reference_suffix
+from app.services.script_parsing import (
     ENGAGEMENT_FALLBACK,
     SCENE_SCHEMA,
     SCENES_SCHEMA,
-    VISUAL_PROMPT_GUIDE,
-    VOICE_CONCURRENCY,
     apply_descriptors,
     has_engagement,
     parse_references,
     parse_scenes,
-    reference_suffix,
-    run_step,
     script_max_tokens,
 )
 from app.services.story import INVENTORY_SCHEMA, STORY_SCHEMA
@@ -193,6 +190,36 @@ async def test_reference_step_makes_one_image_per_element_with_its_prompt(sessio
     await set_running(session, "reference")
     await run_step(ctx, p.id, "reference")
     assert "ghost" in (await get_step(session, p.id, "reference")).error
+
+
+async def test_reference_step_releases_a_local_image_provider_once_even_when_it_fails(session, ctx):
+    p = await seed(session)
+    await set_script_result(session, p.id, references=ELEMENTS)
+    released = []
+
+    class LocalImage:
+        name = "local-image"
+
+        def __init__(self, fail):
+            self.fail = fail
+
+        async def generate(self, prompt, *, model):
+            if self.fail:
+                raise ProviderError("boom", retryable=False)
+            return GenerationResult(b"png", "image/png", 0.0, model)
+
+        async def release(self):
+            released.append(1)
+
+    for fail in (False, True):
+        async def image(name, fail=fail):
+            return LocalImage(fail)
+
+        ctx.registry.image = image
+        await set_running(session, "reference")
+        await run_step(ctx, p.id, "reference")
+        assert len(released) == 1  # une fois par lancement, après toutes les images (ou l'échec)
+        released.clear()
 
 
 async def test_each_clip_starts_from_its_scene_reference_or_the_project_image(session, ctx):
@@ -522,9 +549,17 @@ async def test_clips_run_overrides_win_over_step_params_without_saving_them(sess
     assert step.params == {"provider": "fal", "model": "kling"}
 
 
+def test_local_comfyui_reference_images_get_a_longer_timeout_and_one_call_per_element():
+    from app.providers.comfyui import IMAGE_TIMEOUT_S
+    from app.services.timeouts import DEFAULT_TIMEOUT, job_timeout, step_timeout
+
+    assert step_timeout("reference", "comfyui") == IMAGE_TIMEOUT_S > step_timeout("reference", "gemini") == DEFAULT_TIMEOUT
+    assert job_timeout("reference", 6, "comfyui") > 6 * IMAGE_TIMEOUT_S > job_timeout("reference", 1, "comfyui")
+
+
 def test_local_comfyui_clips_get_a_longer_timeout_than_cloud_ones():
     from app.providers.comfyui import CLIP_TIMEOUT_S, MAX_POLLS
-    from app.services.pipeline import STEP_TIMEOUTS, job_timeout, step_timeout
+    from app.services.timeouts import STEP_TIMEOUTS, job_timeout, step_timeout
 
     assert step_timeout("clips", "comfyui") == CLIP_TIMEOUT_S > STEP_TIMEOUTS["clips"] == step_timeout("clips", "fal")
     assert step_timeout("voice", "comfyui") == step_timeout("voice")  # seule l'étape clips dépend du provider
@@ -535,7 +570,7 @@ def test_local_comfyui_clips_get_a_longer_timeout_than_cloud_ones():
 
 
 def test_local_clips_of_a_long_video_are_not_cut_by_the_job_cap():
-    from app.services.pipeline import job_timeout
+    from app.services.timeouts import job_timeout
 
     # Projet de 17 scènes mesuré : plus de 6 h de clips ComfyUI séquentiels (un GPU, une scène à la fois).
     assert job_timeout("clips", 17, "comfyui") > 12 * 3600
@@ -563,7 +598,7 @@ async def test_clips_call_timeout_follows_resolved_provider(session, ctx, monkey
 
 def test_job_timeout_covers_every_scene_call_with_retries_and_is_bounded():
     from app.services.costs import DEFAULT_ATTEMPTS
-    from app.services.pipeline import MAX_JOB_TIMEOUT, STEP_TIMEOUTS, job_timeout
+    from app.services.timeouts import MAX_JOB_TIMEOUT, STEP_TIMEOUTS, job_timeout
 
     assert job_timeout("clips", 3) >= 3 * DEFAULT_ATTEMPTS * STEP_TIMEOUTS["clips"]
     assert job_timeout("voice", 4) > job_timeout("voice", 1)
@@ -742,7 +777,7 @@ async def test_llm_without_json_schema_parameter_still_works_for_text_steps(sess
 
 
 def test_script_job_timeout_covers_the_retry_call():
-    from app.services.pipeline import job_timeout, step_timeout
+    from app.services.timeouts import job_timeout, step_timeout
 
     assert job_timeout("script", 0) >= 2 * step_timeout("script") * 3
     assert job_timeout("script", 0) > job_timeout("idea", 0)
@@ -1565,8 +1600,25 @@ async def test_a_launch_choice_beats_the_preference(session, ctx):
 
 async def test_only_comfyui_has_a_start_image_step(session):
     from app.app_settings import AppSettings
-    from app.services.pipeline import start_image_provider
+    from app.services.choices import start_image_provider
     settings = AppSettings(session)
     assert await start_image_provider({"start_image": "gemini"}, settings, "comfyui") == "gemini"
     assert await start_image_provider({"start_image": "gemini"}, settings, "fal") == "comfyui"
     assert await start_image_provider({}, settings, "comfyui") == "comfyui"
+
+
+async def test_reference_choice_defaults_to_flux_dev_on_comfyui(session):
+    from app.app_settings import AppSettings
+    from app.services.choices import reference_choice
+
+    s = AppSettings(session)
+    await s.set("image_provider", "comfyui")
+    assert await reference_choice({}, s) == ("comfyui", "flux-dev")
+    assert await reference_choice({"model": "flux"}, s) == ("fal", "flux")
+
+
+def test_chaque_etape_a_un_executeur():
+    """Une étape ajoutée à STEP_NAMES sans exécuteur (ou une clé mal orthographiée) échouerait seulement au lancement."""
+    from app.services.pipeline import EXECUTORS
+
+    assert set(EXECUTORS) == set(STEP_NAMES)

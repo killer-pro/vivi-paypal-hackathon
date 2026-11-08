@@ -3,6 +3,7 @@ import AssistField from "./AssistField";
 import { Advanced, Field } from "./ui";
 import TextArea from "./TextArea";
 import { MAX_THEME } from "../limits";
+import { t } from "../i18n";
 
 const PLATFORMS = [
   { value: "tiktok", label: "TikTok" },
@@ -33,12 +34,12 @@ export default function ProjectFields({
   const set = <K extends keyof ProjectIn>(key: K, v: ProjectIn[K]) => onChange((prev) => ({ ...prev, [key]: v }));
   const assist = { context: { projectId }, locked, unsaved };
   const theme = (
-    <AssistField label="Thème" kind="theme" value={value.theme} onChange={(v) => set("theme", v)} {...assist}>
+    <AssistField label={t("Thème")} kind="theme" value={value.theme} onChange={(v) => set("theme", v)} {...assist}>
       {(f) => (
         <TextArea
           {...f}
           className="input"
-          placeholder="Ex. 3 astuces pour mieux dormir, ton direct, public 18-30 ans"
+          placeholder={t("Ex. 3 astuces pour mieux dormir, ton direct, public 18-30 ans")}
           maxLength={MAX_THEME}
           value={value.theme}
           onChange={(e) => set("theme", e.target.value)}
@@ -48,7 +49,7 @@ export default function ProjectFields({
   );
   return (
     <>
-      <AssistField label="Titre" kind="project_title" value={value.title} onChange={(v) => set("title", v)} {...assist}>
+      <AssistField label={t("Titre")} kind="project_title" value={value.title} onChange={(v) => set("title", v)} {...assist}>
         {(f) => (
           <input
             {...f}
@@ -62,7 +63,7 @@ export default function ProjectFields({
       </AssistField>
       {!foldTheme && theme}
       <div className="form-row">
-        <Field label="Plateforme">
+        <Field label={t("Plateforme")}>
           <select className="input" value={value.platform} onChange={(e) => set("platform", e.target.value)}>
             {PLATFORMS.map((p) => (
               <option key={p.value} value={p.value}>
@@ -71,7 +72,7 @@ export default function ProjectFields({
             ))}
           </select>
         </Field>
-        <Field label="Durée cible (s)">
+        <Field label={t("Durée cible (s)")}>
           <input
             className="input"
             type="number"
@@ -83,7 +84,7 @@ export default function ProjectFields({
           />
         </Field>
       </div>
-      {foldTheme && <Advanced label="Idée de départ">{theme}</Advanced>}
+      {foldTheme && <Advanced label={t("Idée de départ")}>{theme}</Advanced>}
     </>
   );
 }

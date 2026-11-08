@@ -1,5 +1,5 @@
-"""Effets des événements Stripe sur les comptes (appelé par le webhook signé, dans sa transaction). Les crédits et l'état
-d'abonnement ne changent que par ici."""
+"""Effets des événements Stripe et PayPal sur les comptes (appelé par les webhooks signés, dans leur transaction). Les
+crédits et l'état d'abonnement ne changent que par ici."""
 import logging
 from datetime import UTC, datetime
 
@@ -11,6 +11,7 @@ from app.app_settings import AppSettings
 from app.models import StripeEvent, User
 from app.services import credits
 from app.services.billing import load_billing
+from app.services.paypal_client import PayPalAPI
 
 logger = logging.getLogger("app.payments")
 
@@ -56,8 +57,11 @@ async def _invoice_paid(session: AsyncSession, obj: dict, app_settings: AppSetti
     if end is not None:  # une facture plus ancienne rejouée ne raccourcit jamais la période
         ends_at = datetime.fromtimestamp(end, UTC)
         user.subscription_ends_at = max(ends_at, user.subscription_ends_at or ends_at)
-    quota = (await load_billing(app_settings)).subscription.credits
-    await credits.set_subscription_quota(session, user.id, quota, f"Crédits d'abonnement du mois ({quota})")
+    config = await load_billing(app_settings)
+    plan = ((obj.get("subscription_details") or {}).get("metadata") or {}).get("plan")  # posé au paiement (checkout)
+    tier = config.tier(plan) or config.tiers[0]
+    user.plan_id = tier.id
+    await credits.set_subscription_quota(session, user.id, tier.credits, f"Crédits d'abonnement du mois ({tier.credits})")
 
 
 async def _subscription_deleted(session: AsyncSession, obj: dict) -> None:
@@ -98,3 +102,60 @@ async def apply_paypal_capture(session: AsyncSession, capture: dict, app_setting
         return 0
     await grant_topup(session, user, pack.credits)
     return pack.credits
+
+
+def cycles_completed(subscription: dict) -> int:
+    """Mois déjà prélevés d'un abonnement PayPal : un nouveau cycle payé = un nouveau quota de crédits."""
+    runs = (subscription.get("billing_info") or {}).get("cycle_executions") or []
+    return sum(int(run.get("cycles_completed") or 0) for run in runs if run.get("tenure_type") == "REGULAR")
+
+
+async def apply_paypal_subscription(session: AsyncSession, subscription: dict, app_settings: AppSettings) -> int:
+    """Aligne le compte sur un abonnement PayPal lu par l'API (jamais sur le corps d'un événement) ; renvoie les crédits
+    accordés (0 : cycle déjà crédité, pas encore payé, ou abonnement terminé). Le `custom_id` (compte) est posé par nous à la
+    création ; le plan PayPal désigne le forfait. Un plan qui n'est plus dans l'offre (abonnement d'avant les forfaits,
+    plan recréé) garde le forfait du compte, ou le premier, si l'abonnement est déjà celui du compte ; sinon il est
+    ignoré. Une annulation garde la période déjà payée (`subscription_ends_at`) et le forfait, qui ne compte plus une
+    fois la période finie ; elle libère seulement l'abonnement. Ne fait pas de `commit`."""
+    custom_id, config = str(subscription.get("custom_id") or ""), await load_billing(app_settings)
+    user = await session.get(User, int(custom_id)) if custom_id.isdigit() else None
+    status, cycles = subscription.get("status"), cycles_completed(subscription)
+    if user is not None and status in ("CANCELLED", "EXPIRED"):
+        if user.paypal_subscription_id == subscription["id"]:
+            user.paypal_subscription_id = None
+        return 0
+    offer = config.tier_by_paypal_plan(subscription.get("plan_id"))
+    if offer is None and user is not None and user.paypal_subscription_id == subscription.get("id"):
+        offer = config.tier(user.plan_id) or config.tiers[0]
+    if user is None or offer is None:
+        logger.warning("Abonnement PayPal ignoré (compte ou plan inattendu) : %r", subscription.get("id"))
+        return 0
+    if status != "ACTIVE" or cycles < 1:
+        return 0
+    if not await record_event(session, f"paypal:sub:{subscription['id']}:{cycles}", "subscription"):
+        return 0
+    user.paypal_subscription_id, user.plan_id = subscription["id"], offer.id
+    next_billing = (subscription.get("billing_info") or {}).get("next_billing_time")
+    if next_billing:  # une lecture plus ancienne rejouée ne raccourcit jamais la période
+        ends_at = datetime.fromisoformat(next_billing)
+        user.subscription_ends_at = max(ends_at, user.subscription_ends_at or ends_at)
+    await credits.set_subscription_quota(session, user.id, offer.credits, f"Crédits d'abonnement du mois ({offer.credits})")
+    return offer.credits
+
+
+async def handle_paypal_event(session: AsyncSession, event: dict, paypal: PayPalAPI, app_settings: AppSettings) -> int:
+    """Applique un événement PayPal vérifié ; renvoie les crédits ajoutés. Les types non gérés sont ignorés. Pour un
+    abonnement, l'événement ne sert que de déclencheur : l'état vient de `get_subscription`. Ne fait pas de `commit`."""
+    resource: dict = event["resource"] if isinstance(event.get("resource"), dict) else {}
+    match event.get("event_type"):
+        case "PAYMENT.CAPTURE.COMPLETED":
+            return await apply_paypal_capture(session, resource, app_settings)
+        case "PAYMENT.SALE.COMPLETED":
+            subscription_id = resource.get("billing_agreement_id")
+        case "BILLING.SUBSCRIPTION.ACTIVATED" | "BILLING.SUBSCRIPTION.CANCELLED" | "BILLING.SUBSCRIPTION.EXPIRED":
+            subscription_id = resource.get("id")
+        case _:
+            return 0
+    if not isinstance(subscription_id, str):
+        return 0
+    return await apply_paypal_subscription(session, await paypal.get_subscription(subscription_id), app_settings)

@@ -3,6 +3,7 @@ import type { QueuedRun, Scene } from "../../api";
 import { queueLabel, type Activity } from "../../studio";
 import GenerationTiming from "../GenerationTiming";
 import { ChevronDownIcon, CloseIcon, StopIcon } from "../icons";
+import { t } from "../../i18n";
 
 /**
  * Bandeau des générations en cours, visible quelle que soit l'étape ou la scène affichée : ce qui travaille, où, et de
@@ -55,10 +56,10 @@ export default function ActivityBar({
           </span>
           <GenerationTiming step={a.source} />
           <button className="btn btn-small btn-ghost" onClick={() => onShow(a)}>
-            Voir
+            {t("Voir")}
           </button>
           <button className="btn btn-small btn-ghost" onClick={() => onStop(a)} disabled={busy}>
-            <StopIcon /> Arrêter
+            <StopIcon /> {t("Arrêter")}
           </button>
         </div>
       ))}
@@ -70,7 +71,7 @@ export default function ActivityBar({
             aria-controls={listId}
             onClick={() => setOpen((o) => !o)}
           >
-            {queue.length} en attente <ChevronDownIcon />
+            {t("{n} en attente", { n: queue.length })} <ChevronDownIcon />
           </button>
           {expanded && (
             <ol className="queue-pop" id={listId}>
@@ -79,8 +80,8 @@ export default function ActivityBar({
                   <span className="queue-item">{queueLabel(item, scenes)}</span>
                   <button
                     className="btn btn-ghost btn-icon btn-small"
-                    title="Retirer de la file"
-                    aria-label={`Retirer ${queueLabel(item, scenes)} de la file`}
+                    title={t("Retirer de la file")}
+                    aria-label={t("Retirer {item} de la file", { item: queueLabel(item, scenes) })}
                     onClick={() => onUnqueue(item.id)}
                     disabled={busy}
                   >

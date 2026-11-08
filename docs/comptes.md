@@ -74,7 +74,7 @@ Le vrai envoi SMTP ne journalise jamais le corps.
 4. `GET /api/providers/health` est accessible à tout compte connecté (sondes sortantes avec les clés globales).
 5. Le jeton de vérification ou de réinitialisation reste dans l'URL du navigateur après usage (usage unique).
 6. Les pages `/music` et `/providers` ne sont filtrées que dans la navigation ; l'API renvoie `403` aux non-admins.
-7. Les 100 crédits d'inscription sont accordés à la vérification de l'adresse, une seule fois (`docs/credits.md`).
+7. Les 200 crédits d'inscription sont accordés à la vérification de l'adresse, une seule fois (`docs/credits.md`).
 8. Seuls les crédits bornent la dépense d'un client ; l'abonnement et le paiement arrivent aux lots 3 et 4.
 
 ## Écrans de l'admin

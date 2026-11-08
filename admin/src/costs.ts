@@ -1,4 +1,5 @@
 import { STEP_LABELS, type StepName } from "./steps";
+import { locale, t } from "./i18n";
 
 /** Appels affichés par page ; « Afficher plus » en demande une page de plus (`limit` de `GET /api/costs`). */
 export const CALLS_PAGE = 50;
@@ -50,14 +51,14 @@ export function breakdown(totals: Record<string, number>, labelOf: (key: string)
   }));
 }
 
-const percent = new Intl.NumberFormat("fr-FR", { style: "percent", maximumFractionDigits: 0 });
+const percent = new Intl.NumberFormat(locale, { style: "percent", maximumFractionDigits: 0 });
 
 /** Part du total en pourcent ; un poste non nul arrondi à 0 s'affiche « < 1 % ». */
 export function formatShare(share: number): string {
   return share > 0 && share < 0.005 ? `< ${percent.format(0.01)}` : percent.format(share);
 }
 
-const OTHER_LABELS: Record<string, string> = { assist: "Assistant IA", plan_chat: "Chat du plan" };
+const OTHER_LABELS: Record<string, string> = { assist: t("Assistant IA"), plan_chat: t("Chat du plan") };
 
 /** Libellé d'un poste de dépense : une étape du flux, ou l'assistant IA (`assist`) et le chat du plan (`plan_chat`). */
 export function costStepLabel(step: string): string {

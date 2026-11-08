@@ -10,7 +10,8 @@
 - `ClaudeLLM` : texte via l'API Anthropic ; coût = tokens x `PRICE_IN_PER_M` / `PRICE_OUT_PER_M`. Client SDK créé avec
   `max_retries=0` : les retries sont faits (et journalisés) par `tracked_call`, pas en double par le SDK.
 - `ComfyUIImage` (`providers/comfyui.py`) : image de référence générée par Flux dev sur votre ComfyUI (même graphe `flux-keyframe` que l'image de départ du profil Précision, 576×1008), `image_provider=comfyui`, modèle `flux-dev`. Gratuit ; ≈ 3 min par image mesuré sur un M4 Max. Disponible si les fichiers de `flux_files()` (`profiles.py`) sont installés. Ne replace pas d'images d'entrée (`references` ignoré).
-- `OllamaLLM` (`providers/ollama.py`) : texte généré sur votre machine par Ollama (`POST /api/chat`), sans clé ni coût (`cost_usd` = 0). Réglages `llm_provider=ollama`, `ollama_url` (défaut `http://127.0.0.1:11434`) et `ollama_model` (défaut `gemma4`, meilleur compromis mesuré le 2026-11-04 : 9 s par script, 6,6 Go, JSON toujours valide ; `qwen3:14b` un peu plus rapide mais plus plat, `qwen3:32b` trop lent et trop lourd pour cohabiter avec ComfyUI, à télécharger avec `ollama pull`). Le schéma de sortie structurée est converti du format Gemini (types en majuscules) en JSON Schema ; `keep_alive: 0` décharge le modèle après chaque réponse pour rendre la RAM à ComfyUI ; `think: false` évite que la réflexion mange les tokens. Santé : le modèle choisi est téléchargé. Pour les images de référence, Ollama ne sert à rien : elles restent à Gemini ou fal.ai, ou à ComfyUI (Flux Kontext) pour l'image de départ des scènes.
+- `OllamaLLM` (`providers/ollama.py`) : texte généré sur votre machine par Ollama (`POST /api/chat`), sans clé ni coût (`cost_usd` = 0). Réglages `llm_provider=ollama`, `ollama_url` (défaut `http://127.0.0.1:11434`) et `ollama_model` (défaut `gemma4`, meilleur compromis mesuré le 2026-11-04 : 9 s par script, 6,6 Go, JSON toujours valide ; `qwen3:14b` un peu plus rapide mais plus plat, `qwen3:32b` trop lent et trop lourd pour cohabiter avec ComfyUI, à télécharger avec `ollama pull`). Le schéma de sortie structurée est converti du format Gemini (types en majuscules, `nullable`, `propertyOrdering`) en JSON Schema par `standard_schema` (`providers/base.py`, partagé avec Groq) ; `keep_alive: 0` décharge le modèle après chaque réponse pour rendre la RAM à ComfyUI ; `think: false` évite que la réflexion mange les tokens. Santé : le modèle choisi est téléchargé. Pour les images de référence, Ollama ne sert à rien : elles restent à Gemini ou fal.ai, ou à ComfyUI (Flux Kontext) pour l'image de départ des scènes.
+- `GroqLLM` (`providers/groq.py`) : texte via GroqCloud (API compatible OpenAI, `POST https://api.groq.com/openai/v1/chat/completions`, clé en en-tête `Authorization: Bearer`). Réglages `llm_provider=groq`, `groq_api_key` (env `GROQ_API_KEY`) et `groq_model` (défaut `openai/gpt-oss-120b`, seul modèle du compte qui a passé le test du 2026-11-07 : les six schémas du pipeline en JSON valide, ~1 s par appel ; `qwen/qwen3.8-27b` échoue au JSON imposé). Sortie structurée par `response_format: json_schema` en mode non strict (nos schémas n'exigent pas toutes leurs propriétés), schéma traduit par `standard_schema` ; une réponse refusée par Groq comme non conforme (`json_validate_failed`) est relançable. `reasoning_effort: low`. Prix (`PRICES`, USD par million de tokens, relevés le 2026-11-07) : gpt-oss-120b 0,15 / 0,60, gpt-oss-20b 0,075 / 0,30 ; un script complet coûte moins de 0,005 $. Santé : la liste des modèles répond avec la clé. Hébergé, il remplace Ollama sur un serveur sans GPU.
 - `GeminiLLM` (`providers/gemini.py`) : texte via l'API REST Gemini (`POST
   https://generativelanguage.googleapis.com/v1beta/models/{modèle}:generateContent`, client `httpx` partagé du
   registre, aucune dépendance ajoutée). Le prompt système passe par `systemInstruction`, le prompt par `contents`,
@@ -72,13 +73,25 @@
     avant de relancer l'exception, en best-effort (10 s max, protégé de l'annulation) : `POST /queue {"delete": [id]}`
     s'il est en attente, `POST /interrupt {"prompt_id": id}` s'il tourne. Le prompt d'un autre utilisateur n'est jamais
     touché. Vérifié sur le vrai ComfyUI : timeout à 45 s, prompt interrompu et file vide 2 s après.
+- `ComfyCloudProvider` (`providers/comfycloud.py`, nom `comfycloud`) : mêmes profils (`fast`…`max`) et mêmes graphes
+  que `ComfyUIProvider` (classe parente), exécutés sur les GPU de Comfy Cloud (`https://cloud.comfy.org/api`, en-tête
+  `X-API-Key`, réglage `comfy_cloud_api_key`, env `COMFY_CLOUD_API_KEY`). `cloud_workflow` (`providers/workflows.py`)
+  remplace les chargeurs `UnetLoaderGGUF` (absents du cloud) par `UNETLoader` et les modèles fp8 du cloud (`CLOUD_UNETS`).
+  Suivi par `GET /api/job/{id}/status`, résultat par `/api/history_v2/{id}`, fichier par `/api/view`, qui redirige vers
+  une URL signée lue sans la clé. Coût = durée d'exécution facturée (`GET /api/jobs/{id}`) x `USD_PER_GPU_S` (736 crédits
+  par heure de GPU, 211 crédits par dollar) ; estimation avant lancement par `GPU_S_PER_CLIP`. Mesuré le 2026-11-07 :
+  clip Rapide de 3 s en 36 s, 0,02 $. **Exige un abonnement payant** (Standard ou plus) : un compte gratuit, même avec
+  des crédits achetés, reçoit 403 `FREE_TIER_NOT_ALLOWED` ou 402 `FREE_TIER_EXHAUSTED`, traduits en erreur non
+  relançable `NO_PLAN`. Disponible dès qu'une clé est saisie (pas de requête par carte). 2 clips en parallèle
+  (`CLIP_CONCURRENCY`) ; image de départ par Flux Kontext sur le cloud, comme en local (`COMFY_PROVIDERS` de
+  `registry.py`). `ComfyCloudImage` : image de référence Flux dev sur le cloud (`image_provider=comfycloud`).
 - `ElevenLabsVoice` : synthèse vocale ; coût = nb de caractères x `PRICE_PER_CHAR`.
 - Erreurs HTTP : 5xx et 429 retryables, autres 4xx non (`raise_for_provider`).
 - `AppSettings` : lit la table `settings` puis l'environnement ; seules les clés de `EDITABLE_KEYS` sont modifiables ; les secrets sont masqués (`••••` + 4 derniers caractères).
 - `ProviderRegistry` : construit les providers à la demande ; `FAKE_PROVIDERS=true` renvoie les fakes (quel que soit
   `llm_provider`). `llm()` choisit le provider de texte selon le réglage `llm_provider` (`claude` par défaut,
-  ou `gemini`) ; une autre valeur lève une `ProviderError` explicite (« llm_provider inconnu… »), l'API refusant déjà
-  de l'enregistrer. Le rapport de santé teste Claude **et** Gemini, quel que soit le choix.
+  `gemini`, `groq` ou `ollama`) ; une autre valeur lève une `ProviderError` explicite (« llm_provider inconnu… »), l'API refusant déjà
+  de l'enregistrer. Le rapport de santé teste tous les providers de texte, quel que soit le choix.
   `FakeLLM` répond un JSON de 2 scènes pour le script, des métadonnées (`title`, `description`, `hashtags`) pour l'étape
   final et « ok » sinon : le flow complet peut être parcouru sans clé API.
 
@@ -86,9 +99,11 @@
 | Provider | Clé / réglage | Notes |
 |---|---|---|
 | Claude (LLM) | `ANTHROPIC_API_KEY` | Santé : liste des modèles (gratuite, 10 s max). Prix : `PRICE_IN_PER_M` / `PRICE_OUT_PER_M` dans `providers/claude.py`. |
+| Groq (LLM, alternative hébergée) | `GROQ_API_KEY`, `groq_model`, `llm_provider=groq` | Clé GroqCloud (`gsk_…`). Modèle par défaut `openai/gpt-oss-120b`, prix dans `PRICES` de `providers/groq.py`. |
 | Gemini (LLM, alternative) | `GEMINI_API_KEY`, `gemini_model`, `llm_provider=gemini` | Clé Google AI Studio. Modèle par défaut `gemini-3.5-flash-lite` (rapide, peu cher). Prix USD par million de tokens (entrée / sortie, réflexion comprise) dans `PRICES` de `providers/gemini.py`, relevés le 2026-10-17 : 3.5-flash-lite 0,30 / 2,50 ; 3.1-flash-lite 0,25 / 1,50 ; 3.6-flash et 3.8-flash 0,75 / 3,75 (doublent le 2027-01-01 selon Google) ; 4-argon (modèle phare, cher) 2,00 / 10,00 (double le 2026-12-01). Mettre à jour la table et `PRICES_VALID_UNTIL` à ces dates. Modèle absent de la table : prix le plus élevé de la table (estimation prudente). |
 | fal.ai (image, vidéo) | `FAL_KEY` | Santé : clé renseignée seulement (fal n'a pas de point d'entrée gratuit pour la tester). Jusqu'à 3 clips en parallèle (`CLIP_CONCURRENCY`). Modèles vidéo `kling`, `wan`, `ltx`, image `flux`. Prix estimés (USD/s) modifiables dans `providers/fal.py` (`VIDEO_MODELS[...].price_per_second` : kling 0.28, wan 0.10, ltx 0.04 ; `IMAGE_PRICE = 0.025`), appliqués à la durée réellement générée (`clip_duration`). Ils servent à l'estimation avant lancement et au journal. Seul fournisseur de l'image de référence (`registry.image()`). Sans clé : aucune requête, `ProviderError` non relançable « Clé API fal manquante, à saisir dans Réglages → fal.ai » (image comme vidéo), cartes vidéo et image grisées avec cette raison, lancement de `reference` refusé (`409`). |
 | ComfyUI (vidéo locale) | `COMFYUI_URL`, `default_video_model` (profil) | Profils `fast` (défaut), `balanced`, `precision`, `max` ; workflows livrés dans `backend/workflows/` (format API). Coût 0. Serveur injoignable = erreur non retryable, isolée aux étapes qui l'utilisent. |
+| Comfy Cloud (vidéo, image) | `COMFY_CLOUD_API_KEY`, `default_video_provider=comfycloud` | Abonnement payant requis (Standard ou plus). Profils de ComfyUI, facturés au temps de GPU. Clé testée par `GET /api/user`. |
 | ElevenLabs (voix) | `ELEVENLABS_API_KEY`, `default_voice_id` | Santé : `GET /v1/user` (gratuit). `voice_id` limité à `[A-Za-z0-9_-]{1,64}` (il finit dans l'URL). Prix : `PRICE_PER_CHAR` dans `providers/elevenlabs.py`. `GET /providers/voices` liste les voix du compte (`GET /v1/voices`) pour remplir le catalogue. **`default_voice_id` est obligatoire** pour l'étape voix (identifiant d'une voix ElevenLabs ; en mode fake, n'importe quelle valeur, ex. `fake-voice`). |
 
 Clé API absente (fal, ElevenLabs, Gemini, Claude) : l'appel lève avant toute requête une `ProviderError` non relançable
@@ -109,8 +124,8 @@ Image de référence (`registry.image(provider)`, provider choisi sur l'étape, 
   texte) : utilisé pour l'image de départ des scènes (option `start_image_provider`, voir `profils-generation.md`).
 - **fal** : `flux` (clé `fal_key`). Un ancien paramètre d'étape `model: flux` sans provider vaut fal.
 
-Réglages modifiables dans l'admin (`EDITABLE_KEYS`) : clés API (dont `gemini_api_key`, secret masqué), `llm_provider`
-(`claude` | `gemini`, défaut `claude`), `gemini_model` (défaut `gemini-3.5-flash-lite`), `comfyui_url`, `default_voice_id`, `voice_catalog` (JSON `[{"id", "name"}]`, identifiants au format `voice_id`, uniques, 100 au plus ; liste proposée à l'étape Voix), `default_video_provider` (défaut `comfyui`), `default_video_model` (défaut `fast`, profil Rapide), `image_provider` (`gemini` | `fal`, défaut `gemini`), `gemini_image_model` (défaut `gemini-3.1-flash-image`). `comfyui_workflow_path` n'existe plus (refusé en écriture). La base prime sur l'environnement.
+Réglages modifiables dans l'admin (`EDITABLE_KEYS`) : clés API (dont `gemini_api_key` et `groq_api_key`, secrets masqués), `llm_provider`
+(`claude` | `gemini` | `groq` | `ollama`, défaut `claude`), `gemini_model` (défaut `gemini-3.5-flash-lite`), `groq_model` (défaut `openai/gpt-oss-120b`, un `/` permis), `comfyui_url`, `default_voice_id`, `voice_catalog` (JSON `[{"id", "name"}]`, identifiants au format `voice_id`, uniques, 100 au plus ; liste proposée à l'étape Voix), `default_video_provider` (défaut `comfyui`), `default_video_model` (défaut `fast`, profil Rapide), `image_provider` (`gemini` | `fal`, défaut `gemini`), `gemini_image_model` (défaut `gemini-3.1-flash-image`). `comfyui_workflow_path` n'existe plus (refusé en écriture). La base prime sur l'environnement.
 
 Limites : l'image de référence n'est pas transmise aux modèles texte-vers-vidéo de fal.ai en V1 ; un secret ne peut pas être effacé depuis l'admin (valeur vide = retour à l'environnement). Les clés et réglages enregistrés depuis l'admin sont relus à chaque job (le worker crée un `ProviderRegistry` par job) : pas de redémarrage. Les variables d'environnement (`backend/.env`, dont `FAKE_PROVIDERS`) sont lues au démarrage : redémarrer API et worker après les avoir modifiées.
 
@@ -259,7 +274,7 @@ Non retenus / non testés :
   Pour 30 s, préférer 10 scènes de 3 s.
 
 ### Style de prompt (Wan 2.2)
-Le LLM écrit `visual_prompt` selon `VISUAL_PROMPT_GUIDE` (`services/pipeline.py`, partagé par l'étape script, le chat du
+Le LLM écrit `visual_prompt` selon `VISUAL_PROMPT_GUIDE` (`services/prompts.py`, partagé par l'étape script, le chat du
 plan et l'assistant IA) en **deux paragraphes**, car trois modèles le lisent (`providers.base.split_prompt`) :
 1. l'image de départ, en anglais, 80 à 130 mots : sujet dans sa pose de départ, décor, lumière, style d'image **de la
    fiche visuelle** (le guide n'impose plus « photorealistic, cinematic » : le style vient du projet, `services/styles.py`,

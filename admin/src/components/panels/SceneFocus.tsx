@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { Scene } from "../../api";
+import { t } from "../../i18n";
 
 /** Scène sélectionnée dans la timeline, dans un panneau qui travaille scène par scène (clips, voix). */
 export default function SceneFocus({
@@ -14,12 +15,12 @@ export default function SceneFocus({
   hideText?: boolean;
   children: ReactNode;
 }) {
-  if (!scene) return <p className="empty-line">Aucune scène : générez d'abord le script.</p>;
+  if (!scene) return <p className="empty-line">{t("Aucune scène : générez d'abord le script.")}</p>;
   return (
-    <section className="scene-focus" aria-label={`Scène ${scene.position}`}>
+    <section className="scene-focus" aria-label={t("Scène {n}", { n: scene.position })}>
       <header className="scene-focus-head">
         <h3>
-          Scène {scene.position} <span className="muted">sur {count}</span>
+          {t("Scène {n}", { n: scene.position })} <span className="muted">{t("sur {total}", { total: count })}</span>
         </h3>
         {!hideText && <p className="muted">{scene.voice_text}</p>}
       </header>

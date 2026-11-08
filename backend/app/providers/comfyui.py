@@ -23,6 +23,7 @@ from app.providers.workflows import i2v_workflow, keyframe_workflow, kontext_wor
 # ~2760 s (2510 s mesurées sans upscale + ~250 s d'upscale pour 81 images) ; 1 h 35 = environ x2. Le polling (toutes
 # les 2 s) couvre au moins ce délai.
 CLIP_TIMEOUT_S = 5700
+IMAGE_TIMEOUT_S = 1800  # image de référence Flux dev : ≈ 3 min mesurées, plus si un clip est devant dans la file
 MAX_POLLS = CLIP_TIMEOUT_S // 2
 # Prompt absent de l'historique ET de la file pendant ce nombre de polls consécutifs : ComfyUI a redémarré (ou le prompt
 # a été supprimé), inutile d'attendre jusqu'au timeout.
@@ -75,7 +76,7 @@ def _choices(info: dict, node: str, field: str) -> list[str]:
     return files if isinstance(files, list) else []
 
 
-def _execution_error(history: dict) -> str | None:
+def execution_error(history: dict) -> str | None:
     """Message d'échec d'un prompt terminé en erreur (`status.status_str == "error"`), sinon None."""
     status = history.get("status") or {}
     if status.get("status_str") != "error":
@@ -92,7 +93,7 @@ def _seed() -> int:
     return random.randrange(2**32)  # nouveau seed à chaque clip
 
 
-def _first_output(history: dict) -> dict:
+def first_output(history: dict) -> dict:
     for node in history["outputs"].values():
         for kind in OUTPUT_KINDS:
             if node.get(kind):
@@ -110,6 +111,8 @@ class ComfyUIProvider:
         self._base = base_url.rstrip("/")
         self._c = client
         self._poll = poll_interval
+        self._headers: dict[str, str] = {}  # authentification du service (aucune en local)
+        self._spent = 0.0  # dollars des graphes exécutés depuis le dernier résultat (calcul local : toujours 0)
         # Image Flux d'un run dont l'animation a échoué, par (profil, prompt) : la nouvelle tentative de `tracked_call`
         # (même provider, même prompt) la reprend au lieu de refaire ≈ 2 min de Flux ; oubliée dès que le clip est fait.
         # Durée de vie bornée : le cache vit avec l'instance, une par job (`registry.video`), qui génère ses clips
@@ -119,9 +122,15 @@ class ComfyUIProvider:
     def estimate_cost(self, model: str, duration_s: float) -> float:
         return 0.0
 
+    async def _get(self, path: str, **kwargs) -> httpx.Response:
+        return await self._c.get(f"{self._base}/{path}", headers=self._headers, **kwargs)
+
+    async def _post(self, path: str, **kwargs) -> httpx.Response:
+        return await self._c.post(f"{self._base}/{path}", headers=self._headers, **kwargs)
+
     async def _queued(self) -> tuple[list[str], list[str]]:
         """Identifiants des prompts en cours et en attente (`GET /queue`)."""
-        r = await self._c.get(f"{self._base}/queue")
+        r = await self._get("queue")
         raise_for_provider(r, "comfyui")
         q = r.json()
         return ([item[1] for item in q.get("queue_running", [])], [item[1] for item in q.get("queue_pending", [])])
@@ -129,11 +138,11 @@ class ComfyUIProvider:
     async def _wait_history(self, prompt_id: str) -> dict:
         missing = 0
         for _ in range(MAX_POLLS):
-            r = await self._c.get(f"{self._base}/history/{prompt_id}")
+            r = await self._get(f"history/{prompt_id}")
             raise_for_provider(r, "comfyui")
             history = r.json()
             if prompt_id in history:
-                if error := _execution_error(history[prompt_id]):
+                if error := execution_error(history[prompt_id]):
                     raise ProviderError(f"comfyui: échec du workflow ({error})")
                 return history[prompt_id]
             running, pending = await self._queued()
@@ -147,9 +156,9 @@ class ComfyUIProvider:
         """Retire le prompt de la file, ou l'interrompt s'il tourne (jamais le prompt d'un autre)."""
         running, pending = await self._queued()
         if prompt_id in pending:
-            await self._c.post(f"{self._base}/queue", json={"delete": [prompt_id]})
+            await self._post("queue", json={"delete": [prompt_id]})
         elif prompt_id in running:
-            await self._c.post(f"{self._base}/interrupt", json={"prompt_id": prompt_id})
+            await self._post("interrupt", json={"prompt_id": prompt_id})
 
     async def _wait_or_cancel(self, prompt_id: str) -> dict:
         """Attente du résultat ; si l'appel est abandonné (timeout/annulation, erreur de polling), le prompt est retiré
@@ -161,33 +170,39 @@ class ComfyUIProvider:
                 await asyncio.wait_for(asyncio.shield(self._cancel(prompt_id)), CANCEL_TIMEOUT_S)
             raise
 
-    async def _run(self, workflow: dict, what: str) -> bytes:
-        """Soumet le workflow, attend sa fin (annulé côté ComfyUI si l'appel est abandonné) et télécharge sa sortie."""
-        r = await self._c.post(f"{self._base}/prompt", json={"prompt": workflow})
+    async def _run(self, workflow: dict, what: str, *, free: bool = True) -> bytes:
+        """Soumet le workflow, attend sa fin (annulé côté ComfyUI si l'appel est abandonné) et télécharge sa sortie.
+        `free=False` garde les modèles chargés, pour enchaîner plusieurs images (voir `release`)."""
+        r = await self._post("prompt", json={"prompt": workflow})
         raise_for_provider(r, "comfyui")
-        output = _first_output(await self._wait_or_cancel(r.json()["prompt_id"]))
-        params = {k: output.get(k, "") for k in ("filename", "subfolder", "type")}
-        v = await self._c.get(f"{self._base}/view", params=params)
+        output = first_output(await self._wait_or_cancel(r.json()["prompt_id"]))
+        v = await self._get("view", params={k: output.get(k, "") for k in ("filename", "subfolder", "type")})
         raise_for_provider(v, "comfyui")
-        await self._free()
+        if free:
+            await self._free()
         return ensure_non_empty(v.content, what)
+
+    def _take_spent(self) -> float:
+        """Dollars dépensés depuis le dernier résultat, remis à zéro (un échec suivi d'un nouvel essai est compté sur ce
+        dernier)."""
+        spent, self._spent = self._spent, 0.0
+        return spent
 
     async def _free(self) -> None:
         """Décharge les modèles de ComfyUI (best-effort) : sans cela, ceux de l'étape qui vient de finir (Kontext, puis les
         deux UNets Wan, ≈ 24 Go) restent en cache pendant que la suivante charge les siens, et la RAM de 36 Go swappe."""
         with contextlib.suppress(Exception):
-            await self._c.post(f"{self._base}/free", json={"unload_models": True, "free_memory": True},
-                               timeout=AVAILABILITY_TIMEOUT_S)
+            await self._post("free", json={"unload_models": True, "free_memory": True}, timeout=AVAILABILITY_TIMEOUT_S)
 
     async def _upload(self, png: bytes, name: str = KEYFRAME_UPLOAD_NAME) -> str:
         """Dépose une image dans `input/` de ComfyUI (à la place de la précédente du même nom) ; renvoie le nom à donner
         à `LoadImage`."""
         files = {"image": (name, png, "image/png")}
-        r = await self._c.post(f"{self._base}/upload/image", files=files, data={"overwrite": "true"})
-        raise_for_provider(r, "comfyui")
+        r = await self._post("upload/image", files=files, data={"overwrite": "true"})
+        raise_for_provider(r, self.name)
         body = r.json()
         if not body.get("name"):
-            raise ProviderError("comfyui: envoi de l'image de départ sans nom de fichier en retour")
+            raise ProviderError(f"{self.name}: envoi de l'image de départ sans nom de fichier en retour")
         return f"{body['subfolder']}/{body['name']}" if body.get("subfolder") else body["name"]
 
     async def _keyframe(self, profile, prompt: str, reference: bytes | None, extras: Sequence[bytes] = ()) -> bytes:
@@ -195,7 +210,7 @@ class ComfyUIProvider:
         personnages et marques) ; sans, Flux dev l'invente depuis le prompt (profil Précision seulement). L'envoi et le
         calcul restent sous le verrou de l'image envoyée."""
         if reference is None:
-            return await self._run(keyframe_workflow(profile, prompt, _seed()), "image de départ")
+            return await self._run(keyframe_workflow(prompt, _seed()), "image de départ")
         async with _keyframe_slot():
             names = [await self._upload(reference, REFERENCE_UPLOAD_NAME)]
             for n, extra in enumerate(extras, 2):
@@ -224,27 +239,39 @@ class ComfyUIProvider:
                 data = await self._run(t2v_workflow(profile, plain_prompt(prompt), _seed(), frames), "clip")
         except CONNECTION_ERRORS as e:
             raise ProviderError(f"{UNREACHABLE} ({e})") from e
-        return GenerationResult(data, "video/mp4", 0.0, profile.id, keyframe)
+        return GenerationResult(data, "video/mp4", self._take_spent(), profile.id, keyframe)
+
+    async def still(self, prompt: str) -> bytes:
+        """Image Flux dev d'un prompt. Les modèles restent chargés pour l'image suivante : l'appelant les décharge avec
+        `release` une fois la série finie."""
+        try:
+            return await self._run(keyframe_workflow(prompt, _seed()), "image de référence", free=False)
+        except CONNECTION_ERRORS as e:
+            raise ProviderError(f"{UNREACHABLE} ({e})") from e
+
+    async def release(self) -> None:
+        """Décharge les modèles après une série d'images (best-effort)."""
+        await self._free()
 
     async def _object_info(self, node: str) -> dict:
         """Description d'un nœud ; vide s'il n'est pas installé (ComfyUI répond 404)."""
-        r = await self._c.get(f"{self._base}/object_info/{node}", timeout=AVAILABILITY_TIMEOUT_S)
+        r = await self._get(f"object_info/{node}", timeout=AVAILABILITY_TIMEOUT_S)
         return r.json() if r.status_code == 200 else {}
 
     async def _responds(self) -> bool:
-        return (await self._c.get(f"{self._base}/system_stats", timeout=AVAILABILITY_TIMEOUT_S)).status_code == 200
+        return (await self._get("system_stats", timeout=AVAILABILITY_TIMEOUT_S)).status_code == 200
 
     async def availability(self) -> dict[str, Availability]:
         """Un profil est disponible si ComfyUI répond et que chacun de ses fichiers de modèle est installé (sans image
         de référence : voir `reference_availability`)."""
-        return await self._availability({p.id: required_files(p) for p in PROFILES})
+        return await self.availability_of({p.id: required_files(p) for p in PROFILES})
 
     async def reference_availability(self, model: str) -> Availability:
         """Disponibilité du profil quand le projet a une image de référence : il faut alors aussi Wan I2V et Kontext."""
         profile = get_profile(model)
-        return (await self._availability({profile.id: required_files(profile, reference=True)}))[profile.id]
+        return (await self.availability_of({profile.id: required_files(profile, reference=True)}))[profile.id]
 
-    async def _availability(self, wanted: dict[str, list[ModelFile]]) -> dict[str, Availability]:
+    async def availability_of(self, wanted: dict[str, list[ModelFile]]) -> dict[str, Availability]:
         info = None
         try:
             async with asyncio.timeout(AVAILABILITY_TIMEOUT_S):  # tout l'appel, nœuds chargeurs interrogés ensemble
@@ -283,11 +310,14 @@ class ComfyUIImage:
 
     async def generate(self, prompt, *, model, references=()):
         still, _ = split_prompt(prompt)
-        png = await self._comfy._run(keyframe_workflow(get_profile(PROFILES[0].id), still, _seed()), "image de référence")
-        return GenerationResult(png, "image/png", 0.0, model)
+        data = await self._comfy.still(still)
+        return GenerationResult(data, "image/png", self._comfy._take_spent(), model)
 
     async def image_availability(self) -> dict[str, Availability]:
-        return await self._comfy._availability({self.MODEL: flux_files()})
+        return await self._comfy.availability_of({self.MODEL: flux_files()})
+
+    async def release(self) -> None:
+        await self._comfy.release()
 
     async def health(self) -> bool:
         return await self._comfy.health()

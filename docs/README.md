@@ -4,13 +4,15 @@
 |---|---|
 | `architecture.md` | Composants, flux, modèle de données, garde-fous, limites |
 | `workflow-video.md` | Les 9 étapes du pipeline, états, génération en parallèle, invalidation |
+| `deploiement.md` | Déploiement sur un serveur : compose de production, Caddy, MinIO, mise à jour du VPS |
 | `story.md` | Étape histoire : beats, éléments suivis, contrôles de cohérence, script à partir de la story |
 | `autopilot.md` | Mode automatique (enchaînement des étapes, arrêt sur erreur ou budget) |
 | `api.md` | Routes de l'API, authentification, jobs et événements temps réel |
 | `credits.md` | Crédits : solde à deux lots, registre, prix et devis, réservation / règlement / remboursement, balayeur, réglages `credits_*` |
 | `admin-saas.md` | Admin SaaS : clients, ajustement de crédits, tarifs et marges observées |
 | `paiement.md` | Paiement Stripe : abonnement, recharges, portail, webhooks signés et idempotents, configuration |
-| `abonnement.md` | Accès par abonnement : fonctions réservées (profils, image de référence, styles), `subscription_locked`, motifs de refus |
+| `langue.md` | Langue de l'interface : bascule français / anglais, `t("…")`, dictionnaire `locales/en.ts`, test de couverture |
+| `abonnement.md` | Forfaits (Starter, Créateur, Pro, Gratuit) et leurs avantages, forfait d'un compte, motifs de refus |
 | `comptes.md` | Comptes, vérification d'e-mail, isolation par propriétaire, configuration (admin, SMTP), écrans de l'admin |
 | `providers.md` | Claude, Gemini, fal.ai, ComfyUI (prérequis, workflows, mesures), ElevenLabs, fakes, registre |
 | `profils-generation.md` | Profils de génération vidéo (Rapide, Équilibré, Précision, Maximum) : catalogue, cartes, benchmark, ajout d'un profil |

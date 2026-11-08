@@ -1,15 +1,16 @@
 import type { Asset, ProjectDetail, QueuedRun, Scene } from "./api";
 import { currentStep, STEP_LABELS, STOPPED_BY_USER, type Step, type StepName } from "./steps";
+import { t } from "./i18n";
 
 /** Outils du rail de l'éditeur : chacun regroupe une ou plusieurs étapes (la référence, facultative, vit dans Clips). */
 export const TOOLS = [
-  { id: "idea", label: "Idée", steps: ["idea"] },
-  { id: "script", label: "Script", steps: ["story", "script"] },
-  { id: "clips", label: "Clips", steps: ["reference", "clips"] },
-  { id: "voice", label: "Voix", steps: ["voice"] },
-  { id: "music", label: "Musique", steps: ["music"] },
-  { id: "montage", label: "Montage", steps: ["montage"] },
-  { id: "export", label: "Export", steps: ["final"] },
+  { id: "idea", label: t("Idée"), steps: ["idea"] },
+  { id: "script", label: t("Script"), steps: ["story", "script"] },
+  { id: "clips", label: t("Clips"), steps: ["reference", "clips"] },
+  { id: "voice", label: t("Voix"), steps: ["voice"] },
+  { id: "music", label: t("Musique"), steps: ["music"] },
+  { id: "montage", label: t("Montage"), steps: ["montage"] },
+  { id: "export", label: t("Export"), steps: ["final"] },
 ] as const satisfies readonly { id: string; label: string; steps: readonly StepName[] }[];
 
 export type Tool = (typeof TOOLS)[number];
@@ -28,11 +29,11 @@ export function toolStep(tool: Tool, current: StepName): StepName {
 export type ToolState = "todo" | "running" | "awaiting" | "approved" | "failed";
 
 export const TOOL_STATE_LABELS: Record<ToolState, string> = {
-  todo: "à faire",
-  running: "en cours",
-  awaiting: "à valider",
-  approved: "validé",
-  failed: "en échec",
+  todo: t("à faire"),
+  running: t("en cours"),
+  awaiting: t("à valider"),
+  approved: t("validé"),
+  failed: t("en échec"),
 };
 
 /** Statuts d'une étape lancée (pour l'étape facultative, qui sinon ne compte pas). */
@@ -108,8 +109,8 @@ export function renderIsCurrent(steps: Pick<Step, "name" | "status">[]): boolean
 
 /** Pourquoi « Exporter » est indisponible (infobulle du bouton grisé), ou `null` quand le rendu est à jour. */
 export function exportBlockedReason(steps: Pick<Step, "name" | "status">[], hasRender: boolean): string | null {
-  if (renderIsCurrent(steps)) return hasRender ? null : "Disponible après le montage";
-  return hasRender ? "Le rendu n'est plus à jour : relancez le montage pour l'exporter" : "Disponible après le montage";
+  if (renderIsCurrent(steps)) return hasRender ? null : t("Disponible après le montage");
+  return hasRender ? t("Le rendu n'est plus à jour : relancez le montage pour l'exporter") : t("Disponible après le montage");
 }
 
 /** Phrase à afficher quand une étape vient de quitter `running` entre deux chargements du projet, `null` sinon. */
@@ -117,8 +118,8 @@ export function completionMessage(before: Step[] | undefined, after: Step[]): st
   const done = after.find((s) => s.status !== "running" && before?.find((b) => b.name === s.name)?.status === "running");
   if (!done) return null;
   const label = STEP_LABELS[done.name];
-  if (done.status === "failed") return done.error === STOPPED_BY_USER ? `${label} : arrêtée` : `${label} : échec`;
-  return done.status === "awaiting_validation" ? `${label} : à valider` : `${label} : terminée`;
+  if (done.status === "failed") return done.error === STOPPED_BY_USER ? t("{label} : arrêtée", { label }) : t("{label} : échec", { label });
+  return done.status === "awaiting_validation" ? t("{label} : à valider", { label }) : t("{label} : terminée", { label });
 }
 
 /** Ids des scènes après avoir déplacé celle d'`index` de `delta` rangs ; `null` si elle est déjà au bord. */
@@ -209,7 +210,7 @@ export function stableUrls(cache: UrlCache, assets: Asset[]): Asset[] {
 
 /** Infobulle d'une variante importée : son nom de fichier d'origine (nettoyé par le serveur, affiché seulement). */
 export function importedTitle(asset: Pick<Asset, "original_name">): string | undefined {
-  return asset.original_name ? `Importée : ${asset.original_name}` : undefined;
+  return asset.original_name ? t("Importée : {name}", { name: asset.original_name }) : undefined;
 }
 
 export interface Activity {
@@ -237,9 +238,9 @@ export function activities(steps: Step[], scenes: Pick<Scene, "id" | "position">
 /** Ce que l'étape en cours produit : « scène 3 », « 2 scènes sur 8 », sinon « en cours ». */
 export function activityDetail(step: Pick<Step, "target_scene" | "progress">, scenes: Pick<Scene, "id" | "position">[]): string {
   const target = scenes.find((sc) => sc.id === step.target_scene);
-  if (target) return `scène ${target.position}`;
-  if (step.progress) return `${step.progress.done} scène${step.progress.done > 1 ? "s" : ""} sur ${step.progress.total}`;
-  return "en cours";
+  if (target) return t("scène {n}", { n: target.position });
+  if (step.progress) return t(step.progress.done > 1 ? "{done} scènes sur {total}" : "{done} scène sur {total}", step.progress);
+  return t("en cours");
 }
 
 /**
@@ -260,22 +261,19 @@ export function generationTiming(
   return { elapsed, remaining: Math.max(0, total * unitSeconds - elapsed) };
 }
 
-/** Générations en attente par projet (miroir de `MAX_QUEUED`, `app/services/queue_runs.py`). */
-export const QUEUE_MAX = 5;
-
-export const QUEUE_LABEL = "Mettre en file";
-export const QUEUE_HINT = "Démarre dès que la génération en cours est terminée";
+export const QUEUE_LABEL = t("Mettre en file");
+export const QUEUE_HINT = t("Démarre dès que la génération en cours est terminée");
 
 /** Une génération en file : « Clips, scène 7 », sans scène pour toutes. */
 export function queueLabel(item: QueuedRun, scenes: Pick<Scene, "id" | "position">[]): string {
   const scene = scenes.find((s) => s.id === item.scene_id);
-  return scene ? `${STEP_LABELS[item.step]}, scène ${scene.position}` : STEP_LABELS[item.step];
+  return scene ? t("{step}, scène {n}", { step: STEP_LABELS[item.step], n: scene.position }) : STEP_LABELS[item.step];
 }
 
 /** Pourquoi les boutons sont grisés : la génération en cours (ou, à défaut, l'action en attente), sinon `null`. */
 export function busyReason(running: Activity[], busy: boolean): string | null {
-  if (running.length > 0) return `En cours : ${running.map((a) => `${a.label}, ${a.detail}`).join(" ; ")}`;
-  return busy ? "Action en cours" : null;
+  if (running.length > 0) return t("En cours : {list}", { list: running.map((a) => `${a.label}, ${a.detail}`).join(" ; ") });
+  return busy ? t("Action en cours") : null;
 }
 
 /** Images d'entrée d'un clip au plus, la principale comprise (miroir de `MAX_KONTEXT_IMAGES`, `services/story.py`). */
@@ -294,6 +292,6 @@ export function chainBlockedReason(scenes: Pick<Scene, "position" | "continuity"
   if (scene.continuity !== "continue") return null;
   const previous = scenes.find((s) => s.position === scene.position - 1);
   return previous && previous.selected_clip_asset_id === null
-    ? `Générez d'abord le clip de la scène ${previous.position} : celle-ci part de sa dernière image.`
+    ? t("Générez d'abord le clip de la scène {n} : celle-ci part de sa dernière image.", { n: previous.position })
     : null;
 }

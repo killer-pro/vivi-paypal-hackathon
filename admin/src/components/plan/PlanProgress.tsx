@@ -2,12 +2,13 @@ import type { ReactNode } from "react";
 import { planProgress, type PlanStepState } from "../../planChat";
 import type { Step } from "../../steps";
 import GenerationTiming from "../GenerationTiming";
+import { t } from "../../i18n";
 
 /** Libellé (toujours affiché : l'état ne se lit jamais à la seule couleur) et classe de statut (`.st-*`) de chaque état. */
 const STATES: Record<PlanStepState, { label: string; st: string }> = {
-  done: { label: "Prête", st: "st-approved" },
-  running: { label: "En cours", st: "st-running" },
-  failed: { label: "Échec", st: "st-failed" },
+  done: { label: t("Prête"), st: "st-approved" },
+  running: { label: t("En cours"), st: "st-running" },
+  failed: { label: t("Échec"), st: "st-failed" },
   todo: { label: "À venir", st: "st-pending" },
 };
 

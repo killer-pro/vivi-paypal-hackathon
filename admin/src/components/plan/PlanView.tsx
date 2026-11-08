@@ -6,6 +6,7 @@ import type { Flow } from "../../hooks/useProject";
 import CastStrip from "../CastStrip";
 import SceneCard from "../SceneCard";
 import { FormActions } from "../ui";
+import { locale, t, tn } from "../../i18n";
 
 interface Props {
   project: ProjectDetail;
@@ -26,16 +27,15 @@ export default function PlanView({ project, flow, draft, locked, saveBlocked, on
     <form className="form plan-view" onSubmit={onSave}>
       {cast.length > 0 && (
         <section className="plan-section" aria-labelledby="plan-cast">
-          <h2 id="plan-cast">Casting</h2>
+          <h2 id="plan-cast">{t("Casting")}</h2>
           <CastStrip cast={cast} flow={flow} />
         </section>
       )}
       <section className="plan-section" aria-labelledby="plan-scenes">
         <div className="plan-section-head">
-          <h2 id="plan-scenes">Scènes</h2>
+          <h2 id="plan-scenes">{t("Scènes")}</h2>
           <span className="muted">
-            {list.length} scène{list.length > 1 ? "s" : ""}, {total.toLocaleString("fr-FR")} s sur {project.target_duration_s} s
-            visées
+            {tn(list.length, "{n} scène", "{n} scènes")}, {total.toLocaleString(locale)} s {t("sur")} {project.target_duration_s} s {t("visées")}
           </span>
         </div>
         <ol className="scene-list">
@@ -60,7 +60,7 @@ export default function PlanView({ project, flow, draft, locked, saveBlocked, on
         </ol>
         <div>
           <button type="button" className="btn" onClick={draft.add}>
-            Ajouter une scène
+            {t("Ajouter une scène")}
           </button>
         </div>
       </section>
@@ -71,7 +71,7 @@ export default function PlanView({ project, flow, draft, locked, saveBlocked, on
       )}
       {dirty && (
         <FormActions
-          submitLabel="Enregistrer le plan"
+          submitLabel={t("Enregistrer le plan")}
           onCancel={draft.reset}
           disabled={locked || blank >= 0 || saveBlocked !== null}
           hint={saveBlocked}

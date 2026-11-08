@@ -1,19 +1,10 @@
 import httpx
 
-from app.providers.base import HEALTH_TIMEOUT_S, ProviderError, TextResult, raise_for_provider
+from app.providers.base import HEALTH_TIMEOUT_S, ProviderError, TextResult, raise_for_provider, standard_schema
 
 DEFAULT_URL = "http://127.0.0.1:11434"
 DEFAULT_MODEL = "gemma4"
 TIMEOUT_S = 600  # un modèle local froid met du temps à se charger, puis à écrire un script entier
-
-
-def lower_types(schema):
-    """Le schéma de sortie structurée est écrit au format Gemini (types en majuscules) ; Ollama attend du JSON Schema."""
-    if isinstance(schema, dict):
-        return {k: v.lower() if k == "type" and isinstance(v, str) else lower_types(v) for k, v in schema.items()}
-    if isinstance(schema, list):
-        return [lower_types(v) for v in schema]
-    return schema
 
 
 class OllamaLLM:
@@ -37,7 +28,7 @@ class OllamaLLM:
             "options": {"num_predict": max_tokens},
         }
         if json_schema is not None:
-            payload["format"] = lower_types(json_schema)
+            payload["format"] = standard_schema(json_schema)
         try:
             r = await self._c.post(f"{self._url}/api/chat", json=payload, timeout=TIMEOUT_S)
         except httpx.TransportError as e:

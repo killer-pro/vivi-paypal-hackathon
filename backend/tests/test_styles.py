@@ -1,7 +1,7 @@
 """Style visuel d'un projet : colonne, API et consigne injectée dans le prompt du script."""
 from app.models import Project
 from app.services import styles
-from app.services.pipeline import script_prompt
+from app.services.prompts import script_prompt
 from tests.test_api_steps import set_status
 
 

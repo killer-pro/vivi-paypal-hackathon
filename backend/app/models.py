@@ -38,6 +38,9 @@ class User(Base):
     # Fin de la période d'abonnement payée : abonné tant qu'elle est dans le futur (une annulation ne la prolonge pas).
     subscription_ends_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     stripe_customer_id: Mapped[str | None] = mapped_column(String(80), unique=True, nullable=True)
+    paypal_subscription_id: Mapped[str | None] = mapped_column(String(80), unique=True, nullable=True)
+    # Forfait payé (`billing_config.tiers[].id`) ; absent ou inconnu pour un abonné : le premier forfait.
+    plan_id: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     @property

@@ -7,7 +7,7 @@ from app.models import Project, ProviderCall, Scene, Step
 from app.providers.base import ProviderError, TextResult
 from app.providers.fakes import FAKE_ASSIST
 from app.services.assist import FIELD_KINDS, MAX_INSTRUCTION, MAX_TEXT, clean_output
-from app.services.pipeline import VISUAL_PROMPT_GUIDE
+from app.services.prompts import VISUAL_PROMPT_GUIDE
 from app.state import STEP_NAMES
 from tests.conftest import ensure_admin
 

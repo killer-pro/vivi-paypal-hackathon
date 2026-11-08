@@ -3,6 +3,7 @@ import type { AssistContext, AssistKind } from "../../assist";
 import AssistField from "../AssistField";
 import TextArea from "../TextArea";
 import { MAX_VISUAL_PROMPT } from "../../limits";
+import { t } from "../../i18n";
 
 interface Props {
   /** Titre de la carte (en-tête). */
@@ -35,7 +36,7 @@ export default function PromptEditor({
         <h4>{title}</h4>
         {changed && (
           <button type="button" className="btn btn-small btn-ghost" onClick={() => onChange(original)}>
-            Rétablir l'original
+            {t("Rétablir l'original")}
           </button>
         )}
       </div>

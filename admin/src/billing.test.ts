@@ -1,12 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { checkoutNotice, offerCaption, paypalNotice, paypalReturn, subscriptionStatus, type Billing } from "./billing";
+import {
+  checkoutNotice,
+  offerCaption,
+  paypalNotice,
+  paypalReturn,
+  paypalSubscriptionNotice,
+  paypalSubscriptionReturn,
+  subscriptionStatus,
+  type Billing,
+} from "./billing";
 
 const billing = (over: Partial<Billing> = {}): Billing => ({
-  subscription: { credits: 400, label: "19 $ par mois", purchasable: true, paypal_purchasable: false },
+  tiers: [],
+  free: { perks: { queue_max: 1, references_max: 2, profiles: ["fast"], max_duration_s: 30, parallel_clips: 1, styles: false } },
+  current_tier: null,
   packs: [{ id: "pack200", credits: 200, label: "10 $", purchasable: true, paypal_purchasable: true }],
   subscribed: false,
   subscription_ends_at: null,
   manageable: false,
+  paypal_cancellable: false,
   ...over,
 });
 
@@ -66,5 +78,32 @@ describe("paypalNotice", () => {
   it("patiente tant que la capture n'a pas répondu, et rassure en cas d'annulation", () => {
     expect(paypalNotice({ status: "success", orderId: "O" }, null)).toContain("confirmation");
     expect(paypalNotice({ status: "cancelled" }, null)).toContain("rien n'a été débité");
+  });
+});
+
+describe("paypalSubscriptionReturn", () => {
+  it("lit l'abonnement approuvé au retour de PayPal", () => {
+    expect(paypalSubscriptionReturn("?paypal_sub=success&subscription_id=I-SUB1&ba_token=BA-1&token=T")).toEqual({
+      status: "success",
+      subscriptionId: "I-SUB1",
+    });
+  });
+  it("ignore un retour sans abonnement, reconnaît l'annulation et laisse passer le reste", () => {
+    expect(paypalSubscriptionReturn("?paypal_sub=success")).toBeNull();
+    expect(paypalSubscriptionReturn("?paypal_sub=cancelled&ba_token=BA-1")).toEqual({ status: "cancelled" });
+    expect(paypalSubscriptionReturn("?paypal=success&token=ORDER-1")).toBeNull();
+  });
+});
+
+describe("paypalSubscriptionNotice", () => {
+  const approved = { status: "success", subscriptionId: "I-SUB1" } as const;
+  it("annonce les crédits du mois, ou un abonnement déjà pris en compte", () => {
+    expect(paypalSubscriptionNotice(approved, { activated: true, credited: 400 })).toContain("400 crédits");
+    expect(paypalSubscriptionNotice(approved, { activated: true, credited: 0 })).toContain("déjà pris en compte");
+  });
+  it("patiente tant que le premier prélèvement n'est pas confirmé, et rassure en cas d'annulation", () => {
+    expect(paypalSubscriptionNotice(approved, null)).toContain("confirmation");
+    expect(paypalSubscriptionNotice(approved, { activated: false, credited: 0 })).toContain("confirmation");
+    expect(paypalSubscriptionNotice({ status: "cancelled" }, null)).toContain("rien n'a été débité");
   });
 });

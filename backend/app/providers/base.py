@@ -53,6 +53,10 @@ class TextResult:
 
 
 class ProviderError(Exception):
+    """Échec attendu au message lisible tel quel par l'utilisateur (appel provider, mais aussi ffmpeg ou réponse LLM illisible).
+
+    `retryable` : `tracked_call` peut relancer l'appel ; toute autre exception s'affiche préfixée de son type."""
+
     def __init__(self, message: str, retryable: bool = False):
         super().__init__(message)
         self.retryable = retryable
@@ -134,6 +138,19 @@ async def key_is_valid(client: httpx.AsyncClient, key: str, url: str, headers: d
         return (await client.get(url, headers=headers, timeout=HEALTH_TIMEOUT_S)).status_code == 200
     except httpx.HTTPError:
         return False
+
+
+def standard_schema(schema):
+    """Schéma de sortie structurée écrit au format Gemini (types en majuscules, `nullable`, `propertyOrdering`) traduit
+    en JSON Schema, attendu par Ollama et les API compatibles OpenAI (Groq)."""
+    if isinstance(schema, list):
+        return [standard_schema(v) for v in schema]
+    if not isinstance(schema, dict):
+        return schema
+    out = {k: standard_schema(v) for k, v in schema.items() if k not in ("nullable", "propertyOrdering")}
+    if isinstance(out.get("type"), str):  # une propriété nommée « type » a pour valeur un schéma, pas un nom de type
+        out["type"] = [out["type"].lower(), "null"] if schema.get("nullable") is True else out["type"].lower()
+    return out
 
 
 def raise_for_provider(resp: httpx.Response, what: str) -> None:

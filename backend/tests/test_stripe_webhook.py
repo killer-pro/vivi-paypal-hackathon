@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from app.app_settings import AppSettings
 from app.models import CreditEntry, StripeEvent
 from app.services import credits
+from tests.test_billing_api import config_with
 from tests.test_stripe_client import SECRET, sign
 
 NEXT_MONTH = int((datetime.now(UTC) + timedelta(days=30)).timestamp())
@@ -15,7 +16,9 @@ NEXT_MONTH = int((datetime.now(UTC) + timedelta(days=30)).timestamp())
 
 @pytest.fixture(autouse=True)
 async def webhook_secret(session):
-    await AppSettings(session).set("stripe_webhook_secret", SECRET)
+    app_settings = AppSettings(session)
+    await app_settings.set("stripe_webhook_secret", SECRET)
+    await app_settings.set("billing_config", json.dumps(config_with(tier={"credits": 400})))
 
 
 async def send(api_as, event: dict, *, secret: str = SECRET, at: float | None = None, header: str | None = None):
@@ -31,9 +34,10 @@ def topup_event(event_id, user_id, credits_sold=200, status="paid"):
         "metadata": {"credits": str(credits_sold), "pack_id": "pack200"}}}}
 
 
-def invoice_event(event_id, customer="cus_1", period_end=NEXT_MONTH, subscription="sub_1"):
+def invoice_event(event_id, customer="cus_1", period_end=NEXT_MONTH, subscription="sub_1", plan=None):
     return {"id": event_id, "type": "invoice.paid", "data": {"object": {
         "customer": customer, "subscription": subscription, "billing_reason": "subscription_cycle",
+        "subscription_details": {"metadata": {"plan": plan} if plan else {}},
         "lines": {"data": [{"period": {"end": period_end}}]}}}}
 
 
@@ -104,6 +108,14 @@ async def test_invoice_paid_starts_the_subscription_and_grants_the_monthly_quota
     ends = (await session.get(User, uid, populate_existing=True)).subscription_ends_at
     assert ends is not None and ends > datetime.now(UTC) + timedelta(days=29) and (await session.get(User, uid)).is_subscribed
     assert (await balance(session, user.id)).total == 0
+
+
+async def test_invoice_paid_takes_the_tier_from_the_subscription_metadata(api_as, make_user, session):
+    from app.models import User
+    uid = await customer(session, make_user)
+    await send(api_as, invoice_event("evt_1", plan="creator"))
+    assert (await session.get(User, uid, populate_existing=True)).plan_id == "creator"
+    assert await balance(session, uid) == credits.Balance(3000, 0)
 
 
 async def test_renewal_resets_the_subscription_lot_and_the_leftover_expires(api_as, make_user, session):

@@ -1,8 +1,9 @@
+import { t } from "./i18n";
 /** Histoire d'une vidéo (étape `story`) : beats et éléments suivis, tels que le backend les stocke (`services/story.py`). */
 
 export type ElementKind = "character" | "prop" | "place";
-export const ELEMENT_KINDS: Record<ElementKind, string> = { character: "Personnage", prop: "Accessoire", place: "Lieu" };
-const ELEMENT_KINDS_PLURAL: Record<ElementKind, string> = { character: "personnages", prop: "accessoires", place: "lieux" };
+export const ELEMENT_KINDS: Record<ElementKind, string> = { character: t("Personnage"), prop: t("Accessoire"), place: t("Lieu") };
+const ELEMENT_KINDS_PLURAL: Record<ElementKind, string> = { character: t("personnages"), prop: t("accessoires"), place: t("lieux") };
 
 /** Compteur des éléments suivis par type, ex. « 2 personnages, 1 lieu » ; chaîne vide sans élément. */
 export function elementCounts(elements: Pick<StoryElement, "kind">[]): string {
@@ -35,8 +36,8 @@ export interface BeatElement {
  *  « cut » : changement de lieu, il repart des images de référence. */
 export type Continuity = "continue" | "cut";
 export const CONTINUITY_LABELS: Record<Continuity, string> = {
-  continue: "Suite directe du beat précédent",
-  cut: "Changement de lieu ou de plan",
+  continue: t("Suite directe du beat précédent"),
+  cut: t("Changement de lieu ou de plan"),
 };
 
 export interface StoryBeat {

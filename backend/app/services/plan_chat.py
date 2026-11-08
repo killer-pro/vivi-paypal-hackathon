@@ -19,7 +19,7 @@ from app.services import langfuse
 from app.services.budget import ensure_within_budget
 from app.services.costs import tracked_call
 from app.services.flow import ensure_not_running, load_steps, mark_stale, script_stale_names, sync_status
-from app.services.pipeline import ENGAGEMENT_RULE, VISUAL_PROMPT_GUIDE, project_brief
+from app.services.prompts import ENGAGEMENT_RULE, VISUAL_PROMPT_GUIDE, project_brief
 from app.services.steps import lock_project
 from app.services.styles import directive
 from app.state import STEP_NAMES

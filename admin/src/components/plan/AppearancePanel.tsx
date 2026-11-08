@@ -4,6 +4,7 @@ import type { usePlanDraft } from "../../hooks/usePlanDraft";
 import AssistField from "../AssistField";
 import CostSummary from "../CostSummary";
 import TextArea from "../TextArea";
+import { t } from "../../i18n";
 
 interface Props {
   project: ProjectDetail;
@@ -30,9 +31,9 @@ export default function AppearancePanel({ project, bible, locked, dirty }: Props
 
   return (
     <aside className="appearance" aria-labelledby="appearance-title">
-      <h2 id="appearance-title">Apparence</h2>
+      <h2 id="appearance-title">{t("Apparence")}</h2>
       <AssistField
-        label="Fiche visuelle (personnages, marques, décor, style)"
+        label={t("Fiche visuelle (personnages, marques, décor, style)")}
         kind="bible"
         value={bible.value}
         onChange={bible.set}
@@ -45,15 +46,15 @@ export default function AppearancePanel({ project, bible, locked, dirty }: Props
       </AssistField>
       <dl className="appearance-facts">
         <div>
-          <dt>Style</dt>
+          <dt>{t("Style")}</dt>
           <dd>{style}</dd>
         </div>
         <div>
-          <dt>Images de référence</dt>
+          <dt>{t("Images de référence")}</dt>
           <dd>{imageModel ?? choice.model}</dd>
         </div>
       </dl>
-      <CostSummary spent={project.cost_usd} byStep={project.cost_by_step} budget={project.budget_usd} />
+      <CostSummary project={project} />
     </aside>
   );
 }

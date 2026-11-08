@@ -4,7 +4,8 @@ from decimal import Decimal
 import pytest
 
 from app.app_settings import AppSettings
-from app.services.pricing import ACTIONS, DEFAULT_PRICING, Pricing, credits_for, load_pricing
+from app.providers.comfycloud import cloud_clip_usd
+from app.services.pricing import ACTIONS, DEFAULT_PRICING, Pricing, credits_for, load_pricing, video_credits
 
 USD = Decimal("0.05")
 
@@ -28,8 +29,9 @@ def test_no_float_error():
 
 def test_margin_override_per_action():
     pricing = _pricing(margin_overrides={"story": 5})
-    assert pricing.action_credits("story") == 3  # 0,03 $ × 5 ÷ 0,05 = 3
-    assert pricing.action_credits("script") == 3  # 0,05 $ × 2,5 ÷ 0,05 = 2,5 → 3 (marge globale)
+    assert pricing.action_credits("story") == 1  # 0,006 $ × 5 ÷ 0,05 = 0,6 → 1
+    assert pricing.action_credits("reference") == 2  # 0,04 $ × 2,5 ÷ 0,05 = 2 (marge globale)
+    assert _pricing(margin_overrides={"reference": 5}).action_credits("reference") == 4
 
 
 def test_local_clip_cost_scales_with_duration():
@@ -63,7 +65,7 @@ async def test_pricing_setting_rejects_invalid_json_or_negative(session, raw):
 
 @pytest.mark.parametrize("key,value", [
     ("credits_usd_per_credit", "0"), ("credits_margin", "abc"), ("credits_signup_grant", "-1"),
-    ("credits_reservation_timeout_min", "0"), ("credits_max_parallel_clips", "0"), ("credits_signup_grant", "1.5"),
+    ("credits_reservation_timeout_min", "0"), ("credits_signup_grant", "1.5"),
 ])
 async def test_numeric_credit_settings_are_validated(session, key, value):
     with pytest.raises(ValueError, match=key):
@@ -73,9 +75,23 @@ async def test_numeric_credit_settings_are_validated(session, key, value):
 async def test_load_pricing_reads_settings(session):
     app_settings = AppSettings(session)
     default = await load_pricing(app_settings)
-    assert default.usd_per_credit == USD and default.margin == Decimal("2.5")
+    assert default.usd_per_credit == Decimal("0.01") and default.margin == Decimal("3")
     await app_settings.set("credits_margin", "5")
     await app_settings.set("credits_pricing", json.dumps({"flat_usd": {"idea": 0.1}}))
     pricing = await load_pricing(app_settings)
-    assert pricing.action_credits("idea") == 10  # 0,1 × 5 ÷ 0,05
-    assert pricing.action_credits("story") == 3  # les autres prix gardent leur défaut (0,03 × 5 ÷ 0,05)
+    assert pricing.action_credits("idea") == 50  # 0,1 × 5 ÷ 0,01
+    assert pricing.action_credits("story") == 3  # les autres prix gardent leur défaut (0,006 × 5 ÷ 0,01)
+
+
+async def test_30s_video_fits_signup_grant(session):
+    app_settings = AppSettings(session)
+    pricing = await load_pricing(app_settings)
+    assert (pricing.usd_per_credit, pricing.margin) == (Decimal("0.01"), Decimal("3"))
+    cost = video_credits(pricing)
+    assert 100 <= cost <= int(await app_settings.get("credits_signup_grant")) == 200
+
+
+def test_cloud_clip_usd_follows_the_measured_gpu_time():
+    assert cloud_clip_usd("fast", 3) == pytest.approx(0.0213, abs=0.0001)
+    assert cloud_clip_usd("fast", 6) == pytest.approx(2 * cloud_clip_usd("fast", 3), abs=0.0001)
+    assert cloud_clip_usd("balanced", 3) < cloud_clip_usd("precision", 3) < cloud_clip_usd("max", 3)

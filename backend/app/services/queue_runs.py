@@ -6,11 +6,12 @@ from fastapi import HTTPException
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import QueuedRun
+from app.app_settings import AppSettings
+from app.models import QueuedRun, User
+from app.services import access
 from app.services.flow import StepBusy, load_steps
 from app.services.steps import Enqueue, Publish, launch_step, lock_project
 
-MAX_QUEUED = 5  # demandes en attente par projet
 log = logging.getLogger(__name__)
 
 
@@ -22,13 +23,13 @@ async def queued_runs(session: AsyncSession, project_id: int) -> list[QueuedRun]
 async def run_or_queue(session: AsyncSession, project_id: int, name: str, enqueue: Enqueue, scene_id: int | None,
                        overrides: dict | None, **options) -> bool:
     """Lance l'étape ; si une génération la bloque, la met en file. Renvoie `True` si elle a été mise en file, 409 si la
-    file est pleine. Les autres refus (étape précédente non validée, budget, modèle…) restent des erreurs immédiates."""
+    file est pleine (taille fixée par le forfait du propriétaire du projet). Les autres refus (étape précédente non validée, budget, modèle…) restent des erreurs immédiates."""
     try:
         await launch_step(session, project_id, name, enqueue, scene_id, overrides, **options)
         return False
     except StepBusy as busy:
         await session.rollback()
-        await lock_project(session, project_id)
+        project = await lock_project(session, project_id)
         whole_step = scene_id is None and not (overrides or {}).get("reference_id")  # un élément seul se met en file
         if whole_step and any(st.name == name and st.status == "running" for st in await load_steps(session, [project_id])):
             raise  # relancer l'étape entière pendant qu'elle tourne : rien à mettre en attente
@@ -36,8 +37,10 @@ async def run_or_queue(session: AsyncSession, project_id: int, name: str, enqueu
         queued = await queued_runs(session, project_id)
         if any((q.step, q.scene_id, q.request) == (name, scene_id, request) for q in queued):
             return True  # déjà en file à l'identique
-        if len(queued) >= MAX_QUEUED:
-            raise HTTPException(409, f"File d'attente pleine ({MAX_QUEUED} générations) : {busy.detail}") from busy
+        owner = await session.get(User, project.user_id)
+        assert owner is not None
+        if limit := await access.limit_reason(AppSettings(session), owner, "queue_max", len(queued) + 1):
+            raise HTTPException(409, f"File d'attente pleine : {busy.detail}. {limit}") from busy
         session.add(QueuedRun(project_id=project_id, step=name, scene_id=scene_id, request=request))
         await session.commit()
         return True

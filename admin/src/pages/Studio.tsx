@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { queueMax, type Access } from "../access";
 import { latestAsset, useApi, type MusicTrack, type ProjectDetail, type ProviderModels } from "../api";
 import CostSummary from "../components/CostSummary";
 import { UnitSecondsContext } from "../components/unitSeconds";
@@ -39,7 +40,6 @@ import {
   busyReason,
   exportBlockedReason,
   neighbourScene,
-  QUEUE_MAX,
   reorderedIds,
   renderIsCurrent,
   shortcutFor,
@@ -50,6 +50,7 @@ import {
   type UrlCache,
 } from "../studio";
 import "./Studio.css";
+import { t } from "../i18n";
 
 const PANELS: Record<StepName, ComponentType<PanelProps>> = {
   idea: IdeaPanel,
@@ -82,6 +83,7 @@ function useStableProject(project: ProjectDetail | undefined): ProjectDetail | u
  */
 function Studio({ id }: { id: number }) {
   const flow = useProject(id);
+  const access = useApi<Access>("/access").data; // taille de la file : forfait du compte
   const project = useStableProject(flow.project);
   const [selected, setSelected] = useState<StepName | null>(null);
   const [sceneIndex, setSceneIndex] = useState(0);
@@ -166,7 +168,7 @@ function Studio({ id }: { id: number }) {
         {flow.loadError ? (
           <ErrorState message={flow.loadError} onRetry={flow.refresh} />
         ) : (
-          <p className="muted">Chargement…</p>
+          <p className="muted">{t("Chargement…")}</p>
         )}
       </main>
     );
@@ -233,8 +235,8 @@ function Studio({ id }: { id: number }) {
         <Link
           className="back"
           to="/"
-          aria-label="Retour aux projets"
-          title="Retour aux projets"
+          aria-label={t("Retour aux projets")}
+          title={t("Retour aux projets")}
           onClick={(e) => {
             e.preventDefault();
             leave(() => navigate("/"));
@@ -243,7 +245,7 @@ function Studio({ id }: { id: number }) {
           <BackIcon />
         </Link>
         <TitleField title={project.title} onRename={flow.rename} locked={flow.busy} />
-        <CostSummary spent={project.cost_usd} byStep={project.cost_by_step} budget={project.budget_usd} />
+        <CostSummary project={project} />
         <ActivityBar
           activities={running}
           busy={flow.busy}
@@ -253,9 +255,9 @@ function Studio({ id }: { id: number }) {
           }}
           onStop={(a) =>
             confirm({
-              title: "Arrêter la génération ?",
-              message: `« ${a.label} » est abandonnée ; les éléments déjà générés restent disponibles.`,
-              confirmLabel: "Arrêter",
+              title: t("Arrêter la génération ?"),
+              message: t("« {label} » est abandonnée ; les éléments déjà générés restent disponibles.", { label: a.label }),
+              confirmLabel: t("Arrêter"),
               onConfirm: () => flow.cancel(a.step),
             })
           }
@@ -271,17 +273,17 @@ function Studio({ id }: { id: number }) {
                 Génération automatique : <strong>{autopilotLabel(project)}</strong>
               </span>
               <button className="btn btn-small btn-ghost" onClick={flow.stopAutopilot} disabled={flow.busy}>
-                <StopIcon /> Arrêter
+                <StopIcon /> {t("Arrêter")}
               </button>
             </div>
           )}
           {render && !exportBlocked ? (
             <a className="btn btn-primary" href={`/api/projects/${project.id}/assets/${render.id}/download`}>
-              <DownloadIcon /> <span className="hide-narrow">Exporter</span>
+              <DownloadIcon /> <span className="hide-narrow">{t("Exporter")}</span>
             </a>
           ) : (
             <button className="btn" disabled title={exportBlocked ?? undefined}>
-              <DownloadIcon /> <span className="hide-narrow">Exporter</span>
+              <DownloadIcon /> <span className="hide-narrow">{t("Exporter")}</span>
             </button>
           )}
         </div>
@@ -314,7 +316,7 @@ function Studio({ id }: { id: number }) {
           {!compact && (
             <PanelEdge
               id="rail"
-              label="les scènes"
+              label={t("les scènes")}
               width={layout.rail.width}
               collapsed={railCollapsed}
               onResize={(w) => resize("rail", w)}
@@ -325,11 +327,11 @@ function Studio({ id }: { id: number }) {
         </SceneList>
       )}
 
-      <aside className={panelCollapsed ? "studio-panel is-collapsed" : "studio-panel"} aria-label="Étape en cours">
+      <aside className={panelCollapsed ? "studio-panel is-collapsed" : "studio-panel"} aria-label={t("Étape en cours")}>
         {!compact && (
             <PanelEdge
               id="panel"
-              label="le panneau de l'étape"
+              label={t("le panneau de l'étape")}
               width={layout.panel.width}
               collapsed={panelCollapsed}
               onResize={(w) => resize("panel", w)}
@@ -346,7 +348,7 @@ function Studio({ id }: { id: number }) {
             step={step}
             previousApproved={previousApproved(project.steps, name)}
             locked={flow.busy || step.status === "running" || downstreamRunning.length > 0}
-            runLocked={flow.busy || project.queue.length >= QUEUE_MAX}
+            runLocked={flow.busy || project.queue.length >= queueMax(access)}
             queueing={step.status === "running" || downstreamRunning.length > 0}
             downstreamRunning={downstreamRunning}
             scene={scene}
@@ -387,9 +389,9 @@ function Studio({ id }: { id: number }) {
 
       {pendingLeave && (
         <ConfirmDialog
-          title="Modifications non enregistrées"
-          message="Les modifications de cette étape n'ont pas été enregistrées et seront perdues."
-          confirmLabel="Quitter sans enregistrer"
+          title={t("Modifications non enregistrées")}
+          message={t("Les modifications de cette étape n'ont pas été enregistrées et seront perdues.")}
+          confirmLabel={t("Quitter sans enregistrer")}
           onConfirm={() => {
             pendingLeave();
             setPendingLeave(null);

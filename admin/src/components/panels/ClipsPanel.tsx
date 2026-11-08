@@ -3,9 +3,10 @@ import { castOf } from "../../casting";
 import { referenceElements, useApi, type Asset, type Estimate, type ProviderModels } from "../../api";
 import { priceLabel } from "../../credits";
 import { usd } from "../../format";
-import { launchBlocked, pickable, START_IMAGE_LABELS, totalEstimate, type Choice } from "../../models";
+import { COMFY_PROVIDERS, launchBlocked, pickable, startImageLabels, totalEstimate, type Choice } from "../../models";
 import { availableActions, hasResult, missingScenes } from "../../steps";
 import { chainBlockedReason, importedTitle, MAX_SCENE_IMAGES, QUEUE_HINT, QUEUE_LABEL, toggled } from "../../studio";
+import { useMe } from "../../hooks/useMe";
 import { usePrice } from "../../hooks/usePrice";
 import CastStrip from "../CastStrip";
 import { CheckIcon, TrashIcon } from "../icons";
@@ -17,6 +18,7 @@ import { Advanced, ConfirmDialog, Field } from "../ui";
 import PromptEditor from "./PromptEditor";
 import ReferenceSection from "./ReferenceSection";
 import SceneFocus from "./SceneFocus";
+import { t, tn } from "../../i18n";
 
 /** Clips : image de référence (facultative), profil de génération dans Avancé, variantes, upload local, prompt IA. */
 export default function ClipsPanel(props: PanelProps) {
@@ -58,9 +60,11 @@ export default function ClipsPanel(props: PanelProps) {
   const promptDraft = scene ? (prompts[scene.id] ?? scene.visual_prompt) : "";
   const promptChanged = scene !== null && promptDraft.trim() !== scene.visual_prompt.trim();
 
-  // Pas d'estimation sans choix lançable (modèles ou réglages pas encore chargés, modèle vide).
+  // Estimation en dollars : admin seulement (un client voit le prix en crédits de la carte et des boutons). Pas
+  // d'estimation sans choix lançable (modèles ou réglages pas encore chargés, modèle vide).
+  const isAdmin = useMe()?.role === "admin";
   const estimate = useApi<Estimate>(
-    choice && !runBlocked ? `/projects/${project.id}/estimate?${new URLSearchParams({ ...choice })}` : null,
+    isAdmin && choice && !runBlocked ? `/projects/${project.id}/estimate?${new URLSearchParams({ ...choice })}` : null,
   );
   const { canRun } = availableActions(step, previousApproved);
   const launchable = previousApproved && !runBlocked;
@@ -103,7 +107,7 @@ export default function ClipsPanel(props: PanelProps) {
 
   /** Résumé compact du modèle choisi, affiché en dehors du volet Avancé. */
   const modelSummary = card
-    ? card.name
+    ? t(card.name)
     : runBlocked
       ? "—"
       : "Chargement…";
@@ -111,13 +115,13 @@ export default function ClipsPanel(props: PanelProps) {
   return (
     <StepPanel
       {...props}
-      runLabel={hasResult(step) ? "Régénérer tous les clips" : "Générer les clips"}
+      runLabel={hasResult(step) ? t("Régénérer tous les clips") : t("Générer les clips")}
       priceBody={{ ...choice, start_image: startImage || undefined }}
       onRun={() => flow.run("clips", undefined, { params: { ...choice, start_image: startImage } })}
       onResume={() => flow.run("clips", undefined, { params: { ...choice, start_image: startImage }, overrides: { resume: true } })}
       onRetryScene={(sceneId) => flow.run("clips", sceneId, { overrides: { ...choice, ...startOverride } })}
-      confirmRun={`Toutes les scènes (${project.scenes.length}) vont être régénérées en « ${card?.name ?? choice?.model} » : ${project.scenes.length} générations, et les clips choisis seront remplacés par les nouveaux. Pour refaire une seule scène, utilisez « Régénérer le clip » sous la scène.`}
-      approveBlocked={missing ? "Choisissez une variante pour chaque scène avant de valider." : undefined}
+      confirmRun={t("Toutes les scènes ({count}) vont être régénérées en « {model} » : {count} générations, et les clips choisis seront remplacés par les nouveaux. Pour refaire une seule scène, utilisez « Régénérer le clip » sous la scène.", { count: project.scenes.length, model: card ? t(card.name) : (choice?.model ?? "") })}
+      approveBlocked={missing ? t("Choisissez une variante pour chaque scène avant de valider.") : undefined}
       runBlocked={runBlocked}
       extraActions={
         withoutClip > 0 &&
@@ -126,15 +130,15 @@ export default function ClipsPanel(props: PanelProps) {
             className="btn"
             onClick={() =>
               confirm({
-                title: `Générer ${withoutClip} clip${withoutClip > 1 ? "s" : ""} ?`,
-                message: `${withoutClip} génération${withoutClip > 1 ? "s" : ""} en « ${card?.name ?? choice?.model} ». Les clips existants ne sont pas touchés.`,
-                confirmLabel: "Générer",
+                title: tn(withoutClip, "Générer {n} clip ?", "Générer {n} clips ?"),
+                message: t(withoutClip > 1 ? "{n} générations en « {model} ». Les clips existants ne sont pas touchés." : "{n} génération en « {model} ». Les clips existants ne sont pas touchés.", { n: withoutClip, model: card ? t(card.name) : (choice?.model ?? "") }),
+                confirmLabel: t("Générer"),
                 onConfirm: () => flow.run("clips", undefined, { params: { ...choice, start_image: startImage }, overrides: { only_missing: true } }),
               })
             }
             disabled={!canRun || locked || Boolean(runBlocked)}
           >
-            {priceLabel(`Générer les ${withoutClip} clip${withoutClip > 1 ? "s" : ""} manquant${withoutClip > 1 ? "s" : ""}`, missingPrice)}
+            {priceLabel(tn(withoutClip, "Générer le clip manquant", "Générer les {n} clips manquants"), missingPrice)}
           </button>
         )
       }
@@ -145,13 +149,15 @@ export default function ClipsPanel(props: PanelProps) {
       {/* ── Profil de génération vidéo (dans Avancé) ── */}
       <Advanced>
         <p className="advanced-model-summary">
-          Modèle vidéo : <strong>{modelSummary}</strong>
-          {estimate.data && !runBlocked && (
-            <span className="muted">
-              {" "}— {card?.minutes_per_clip != null
-                ? totalEstimate(card, project.scenes.length)
-                : `≈ ${usd.format(estimate.data.cost_usd)} pour ${estimate.data.scene_count} scène${estimate.data.scene_count > 1 ? "s" : ""}`}
-            </span>
+          {t("Modèle vidéo :")} <strong>{modelSummary}</strong>
+          {card && !runBlocked && (card.minutes_per_clip != null || card.credits_per_clip != null) ? (
+            <span className="muted"> — {totalEstimate(card, project.scenes.length)}</span>
+          ) : (
+            estimate.data?.cost_usd != null && !runBlocked && (
+              <span className="muted">
+                {" "}— {t(estimate.data.scene_count > 1 ? "≈ {cost} pour {n} scènes" : "≈ {cost} pour {n} scène", { cost: usd.format(estimate.data.cost_usd), n: estimate.data.scene_count })}
+              </span>
+            )
           )}
         </p>
         <ModelCards
@@ -159,15 +165,15 @@ export default function ClipsPanel(props: PanelProps) {
           error={models.error}
           value={choice}
           onChange={setPicked}
-          label="Profil de génération, toutes les scènes"
+          label={t("Profil de génération, toutes les scènes")}
         />
-        {choice?.provider === "comfyui" && (
-          <Field label="Image de départ des scènes avec images de référence">
+        {choice && COMFY_PROVIDERS.includes(choice.provider) && (
+          <Field label={t("Image de départ des scènes avec images de référence")}>
             <select className="input" value={startImage} onChange={(e) => setPickedStart(e.target.value)}>
               <option value="">
-                Selon la préférence ({START_IMAGE_LABELS[settings.data?.start_image_provider ?? "comfyui"]})
+                {t("Selon la préférence ({provider})", { provider: startImageLabels(choice.provider)[settings.data?.start_image_provider ?? "comfyui"] })}
               </option>
-              {Object.entries(START_IMAGE_LABELS).map(([value, label]) => (
+              {Object.entries(startImageLabels(choice.provider)).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
@@ -179,19 +185,19 @@ export default function ClipsPanel(props: PanelProps) {
 
       <SceneFocus scene={scene} count={project.scenes.length}>
         {scene && (
-          <label className="scene-element" title="Sans la case, le clip part de l'image de référence de la scène">
+          <label className="scene-element" title={t("Sans la case, le clip part de l'image de référence de la scène")}>
             <input
               type="checkbox"
               checked={scene.continuity === "continue"}
               disabled={flow.busy || scene.position === 1}
               onChange={(e) => flow.setSceneContinuity(scene.id, e.target.checked ? "continue" : "cut")}
             />
-            Enchaîner : la première image part de la dernière image de la scène précédente
+            {t("Enchaîner : la première image part de la dernière image de la scène précédente")}
           </label>
         )}
         {scene && elements.length > 0 && (
           <fieldset className="scene-elements" disabled={flow.busy}>
-            <legend>Images envoyées avec le clip ({MAX_SCENE_IMAGES} au plus : en cocher une de plus retire la plus ancienne)</legend>
+            <legend>{t("Images envoyées avec le clip ({n} au plus : en cocher une de plus retire la plus ancienne)", { n: MAX_SCENE_IMAGES })}</legend>
             {elements.map((e) => {
               const member = cast.find((m) => m.id === e.id);
               const image = member?.imageUrl;
@@ -208,7 +214,7 @@ export default function ClipsPanel(props: PanelProps) {
                     }}
                   />
                   {image ? <img className="scene-element-thumb" src={image} alt="" /> : <span className="scene-element-thumb" />}
-                  {member?.name ?? e.id}{image ? "" : " (image à générer)"}
+                  {member?.name ?? e.id}{image ? "" : t(" (image à générer)")}
                 </label>
               );
             })}
@@ -219,8 +225,8 @@ export default function ClipsPanel(props: PanelProps) {
             <span className="variants-count">
               {variants.length} variante{variants.length > 1 ? "s" : ""}
             </span>
-            <label className="btn btn-small" title="Importer une vidéo locale comme variante pour cette scène">
-              {uploading ? "Importation…" : "Importer une vidéo"}
+            <label className="btn btn-small" title={t("Importer une vidéo locale comme variante pour cette scène")}>
+              {uploading ? t("Importation…") : t("Importer une vidéo")}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -234,7 +240,7 @@ export default function ClipsPanel(props: PanelProps) {
         )}
 
         {variants.length === 0 ? (
-          <p className="empty-line">Aucun clip pour cette scène.</p>
+          <p className="empty-line">{t("Aucun clip pour cette scène.")}</p>
         ) : (
           <div className="variants">
             {variants.map((clip) => {
@@ -256,13 +262,13 @@ export default function ClipsPanel(props: PanelProps) {
                     <div className="variant-head">
                       <span className="variant-label">
                         Variante {clip.variant}
-                        {clip.meta?.model === "upload" && <span className="variant-badge" title={importedTitle(clip)}> (importée)</span>}
+                        {clip.meta?.model === "upload" && <span className="variant-badge" title={importedTitle(clip)}>{t(" (importée)")}</span>}
                       </span>
                       <button
                         type="button"
                         className="btn btn-ghost btn-danger btn-icon btn-small"
-                        title="Supprimer cette variante"
-                        aria-label={`Supprimer la variante ${clip.variant}`}
+                        title={t("Supprimer cette variante")}
+                        aria-label={t("Supprimer la variante {n}", { n: clip.variant })}
                         onClick={() => setDeleteTarget(clip)}
                         disabled={locked}
                       >
@@ -272,7 +278,7 @@ export default function ClipsPanel(props: PanelProps) {
                     <div className="variant-select-row">
                       {chosen ? (
                         <span className="chosen-tag">
-                          <CheckIcon /> Choisie
+                          <CheckIcon /> {t("Choisie")}
                         </span>
                       ) : (
                         <button
@@ -281,7 +287,7 @@ export default function ClipsPanel(props: PanelProps) {
                           onClick={() => scene && flow.selectClip(scene.id, clip.id)}
                           disabled={locked}
                         >
-                          Choisir
+                          {t("Choisir")}
                         </button>
                       )}
                     </div>
@@ -300,10 +306,10 @@ export default function ClipsPanel(props: PanelProps) {
           >
             <PromptEditor
               key={`${scene.id}:${sent}`}
-              title={`Prompt visuel — Scène ${scene.position}`}
-              fieldLabel="Description de la scène"
-              placeholder="Sujet, action, caméra, lumière, style (en anglais)..."
-              instructionPlaceholder='Ex. : "Change le décor, mets un personnage de teint noir", "Ambiance coucher de soleil"...'
+              title={t("Prompt visuel — Scène {n}", { n: scene.position })}
+              fieldLabel={t("Description de la scène")}
+              placeholder={t("Sujet, action, caméra, lumière, style (en anglais)...")}
+              instructionPlaceholder={t('Ex. : "Change le décor, mets un personnage de teint noir", "Ambiance coucher de soleil"...')}
               rows={4}
               value={promptDraft}
               original={scene.visual_prompt}
@@ -319,7 +325,7 @@ export default function ClipsPanel(props: PanelProps) {
                 >
                   {step.status === "running"
                     ? QUEUE_LABEL
-                    : priceLabel(promptChanged ? "Valider le prompt et régénérer le clip" : "Générer une nouvelle variante", scenePrice)}
+                    : priceLabel(promptChanged ? t("Valider le prompt et régénérer le clip") : t("Générer une nouvelle variante"), scenePrice)}
                 </button>
                 <PriceNote quote={scenePrice} />
                 {previousApproved && runBlocked && <p className="muted">{runBlocked}</p>}
@@ -331,13 +337,13 @@ export default function ClipsPanel(props: PanelProps) {
 
         {deleteTarget && (
           <ConfirmDialog
-            title="Supprimer la variante"
+            title={t("Supprimer la variante")}
             message={
               deleteTarget.id === scene?.selected_clip_asset_id
-                ? `Cette variante (${deleteTarget.variant}) est actuellement sélectionnée pour la scène ${scene?.position}. La supprimer va sélectionner une autre variante disponible. Confirmer la suppression ?`
-                : `Voulez-vous supprimer la variante ${deleteTarget.variant} de cette scène ? Cette action est irréversible.`
+                ? t("Cette variante ({variant}) est actuellement sélectionnée pour la scène {n}. La supprimer va sélectionner une autre variante disponible. Confirmer la suppression ?", { variant: deleteTarget.variant, n: scene?.position ?? "" })
+                : t("Voulez-vous supprimer la variante {variant} de cette scène ? Cette action est irréversible.", { variant: deleteTarget.variant })
             }
-            confirmLabel="Supprimer"
+            confirmLabel={t("Supprimer")}
             onConfirm={handleConfirmDelete}
             onCancel={() => setDeleteTarget(null)}
           />

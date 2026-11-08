@@ -14,7 +14,7 @@ from app.providers.base import ProviderError
 from app.providers.registry import ProviderRegistry
 from app.services import langfuse, styles
 from app.services.costs import tracked_call
-from app.services.pipeline import ENGAGEMENT_RULE, VISUAL_PROMPT_GUIDE, WORDS_PER_SECOND, project_brief, word_budget
+from app.services.prompts import ENGAGEMENT_RULE, VISUAL_PROMPT_GUIDE, WORDS_PER_SECOND, project_brief, word_budget
 
 MODES = ("generate", "rewrite")
 MAX_TEXT = 6000

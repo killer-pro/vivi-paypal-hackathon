@@ -84,6 +84,8 @@ class StripeClient:
         data: dict = {"mode": mode, "customer": customer_id, "line_items": [{"price": price_id, "quantity": 1}],
                       "success_url": success_url, "cancel_url": cancel_url, "client_reference_id": client_reference_id,
                       "metadata": metadata}
+        if mode == "subscription":  # recopiées sur l'abonnement, donc sur chaque facture (`invoice.paid`)
+            data["subscription_data"] = {"metadata": metadata}
         return (await self._post("/checkout/sessions", data))["url"]
 
     async def create_portal(self, customer_id: str, return_url: str) -> str:

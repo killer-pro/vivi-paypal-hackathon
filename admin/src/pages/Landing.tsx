@@ -3,12 +3,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { useApi } from "../api";
 import type { Me } from "../auth";
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, ChevronUpIcon, SparkleIcon } from "../components/icons";
+import LangSwitch from "../components/LangSwitch";
 import ClipWall, { Clip } from "../components/ClipWall";
 import { clip, FORMATS, IDEA_EXAMPLES, moveScene, nextScene, PIPELINE, SCENE_IDS, SCENES, STRENGTHS, STYLES, USE_CASES, wide, type SceneId } from "../landing";
 import { MAX_THEME } from "../limits";
 import { reducedMotion } from "../motion";
 import { cleanIdea, rememberIdea } from "../pendingIdea";
 import "./Landing.css";
+import { t } from "../i18n";
 
 /** Grille de clips verticaux légendés, décalés une colonne sur deux. */
 function Usages({ items }: { items: { name: string; art: string; line: string }[] }) {
@@ -49,7 +51,7 @@ function ScenePlayer() {
         />
       </div>
       <div className="lp-sequence">
-        <h3 className="lp-sequence-title">Ordre de lecture</h3>
+        <h3 className="lp-sequence-title">{t("Ordre de lecture")}</h3>
         <ol className="lp-sequence-list">
           {order.map((id, i) => (
             <li key={id} className={`lp-sequence-item${id === current ? " is-current" : ""}`}>
@@ -63,11 +65,11 @@ function ScenePlayer() {
                 </span>
               </button>
               <span className="lp-sequence-moves">
-                <button type="button" className="btn btn-icon btn-small btn-ghost" aria-label={`Monter ${SCENES[id].title}`}
+                <button type="button" className="btn btn-icon btn-small btn-ghost" aria-label={t("Monter {title}", { title: SCENES[id].title })}
                   disabled={i === 0} onClick={() => setOrder(moveScene(order, id, -1))}>
                   <ChevronUpIcon />
                 </button>
-                <button type="button" className="btn btn-icon btn-small btn-ghost" aria-label={`Descendre ${SCENES[id].title}`}
+                <button type="button" className="btn btn-icon btn-small btn-ghost" aria-label={t("Descendre {title}", { title: SCENES[id].title })}
                   disabled={i === order.length - 1} onClick={() => setOrder(moveScene(order, id, 1))}>
                   <ChevronDownIcon />
                 </button>
@@ -94,17 +96,17 @@ function PipelineCarousel() {
   return (
     <>
       <div className="lp-head">
-        <h2>De l'idée à l'export, sans changer d'outil</h2>
+        <h2>{t("De l'idée à l'export, sans changer d'outil")}</h2>
         <span className="lp-arrows">
-          <button type="button" className="btn btn-icon btn-large" aria-label="Étape précédente" onClick={() => scroll(-1)}>
+          <button type="button" className="btn btn-icon btn-large" aria-label={t("Étape précédente")} onClick={() => scroll(-1)}>
             <ChevronLeftIcon />
           </button>
-          <button type="button" className="btn btn-icon btn-large" aria-label="Étape suivante" onClick={() => scroll(1)}>
+          <button type="button" className="btn btn-icon btn-large" aria-label={t("Étape suivante")} onClick={() => scroll(1)}>
             <ChevronRightIcon />
           </button>
         </span>
       </div>
-      <ol className="lp-track" ref={track} tabIndex={0} aria-label="Étapes du pipeline">
+      <ol className="lp-track" ref={track} tabIndex={0} aria-label={t("Étapes du pipeline")}>
         {PIPELINE.map((step, i) => (
           <li key={step.name} className="lp-card">
             <img src={wide(step.art)} alt="" loading="lazy" />
@@ -138,17 +140,17 @@ function IdeaBar({ connected }: { connected: boolean }) {
         <SparkleIcon />
         <input
           type="text"
-          aria-label="Décrivez la vidéo que vous voulez créer"
-          placeholder="Décrivez votre vidéo…"
+          aria-label={t("Décrivez la vidéo que vous voulez créer")}
+          placeholder={t("Décrivez votre vidéo…")}
           maxLength={MAX_THEME}
           value={idea}
           onChange={(e) => setIdea(e.target.value)}
         />
         <button className="btn btn-primary btn-large" disabled={!cleanIdea(idea)}>
-          Créer ma vidéo
+          {t("Créer ma vidéo")}
         </button>
       </div>
-      <ul className="lp-idea-examples" aria-label="Idées pour commencer">
+      <ul className="lp-idea-examples" aria-label={t("Idées pour commencer")}>
         {IDEA_EXAMPLES.map((example) => (
           <li key={example}>
             <button type="button" className="lp-idea-chip" onClick={() => setIdea(example)}>
@@ -171,12 +173,13 @@ export default function Landing() {
           Vivi
         </span>
         <nav className="landing-nav">
+          <LangSwitch />
           {connected ? (
-            <Link className="btn btn-primary" to="/">Ouvrir l'application</Link>
+            <Link className="btn btn-primary" to="/">{t("Ouvrir l'application")}</Link>
           ) : (
             <>
-              <Link className="btn btn-ghost" to="/login">Se connecter</Link>
-              <Link className="btn btn-primary" to="/register">S'inscrire</Link>
+              <Link className="btn btn-ghost" to="/login">{t("Se connecter")}</Link>
+              <Link className="btn btn-primary" to="/register">{t("S'inscrire")}</Link>
             </>
           )}
         </nav>
@@ -186,28 +189,27 @@ export default function Landing() {
         <section className="lp-hero">
           <ClipWall />
           <div className="lp-hero-copy">
-            <h1>Une idée en entrée. Une vidéo verticale en sortie.</h1>
+            <h1>{t("Une idée en entrée. Une vidéo verticale en sortie.")}</h1>
             <p className="lp-hero-lead">
-              Produit, appartement, collection, histoire à suspense, clip anime : pour TikTok, YouTube Shorts et Reels,
-              décrivez-le, l'outil écrit, filme, met en voix et monte.
+              {t("Produit, appartement, collection, histoire à suspense, clip anime : pour TikTok, YouTube Shorts et Reels, décrivez-le, l'outil écrit, filme, met en voix et monte.")}
             </p>
             <IdeaBar connected={connected} />
           </div>
         </section>
 
         <section className="lp-section" id="usages">
-          <h2 className="lp-title">Tout ce que vous vendez peut avoir sa vidéo</h2>
+          <h2 className="lp-title">{t("Tout ce que vous vendez peut avoir sa vidéo")}</h2>
           <Usages items={USE_CASES} />
         </section>
 
         <section className="lp-section" id="styles">
-          <h2 className="lp-title">Pour TikTok, YouTube Shorts et Reels, dans le style qui vous ressemble</h2>
+          <h2 className="lp-title">{t("Pour TikTok, YouTube Shorts et Reels, dans le style qui vous ressemble")}</h2>
           <Usages items={STYLES} />
           <Usages items={FORMATS} />
         </section>
 
         <section className="lp-section lp-split" id="scenes">
-          <h2 className="lp-title">Les scènes sont indépendantes : changez l'ordre, la pub se remonte</h2>
+          <h2 className="lp-title">{t("Les scènes sont indépendantes : changez l'ordre, la pub se remonte")}</h2>
           <ScenePlayer />
         </section>
 
@@ -216,7 +218,7 @@ export default function Landing() {
         </section>
 
         <section className="lp-section">
-          <h2 className="lp-title">Pensé pour tourner chez vous</h2>
+          <h2 className="lp-title">{t("Pensé pour tourner chez vous")}</h2>
           <dl className="lp-strengths">
             {STRENGTHS.map((s) => (
               <div key={s.title} className="lp-strength">
@@ -230,7 +232,7 @@ export default function Landing() {
         <section className="lp-closing">
           <img className="lp-closing-media" src={wide("conclusion")} alt="" loading="lazy" />
           <div className="lp-closing-copy">
-            <h2>Essayez avec votre première idée</h2>
+            <h2>{t("Essayez avec votre première idée")}</h2>
             <IdeaBar connected={connected} />
           </div>
         </section>

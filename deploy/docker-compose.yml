@@ -1,0 +1,59 @@
+# Déploiement sur un serveur : `cd deploy && docker compose up -d --build` (voir docs/deploiement.md). Seul Caddy publie des
+# ports (Docker contourne ufw pour les ports publiés). Secrets d'infra dans deploy/.env, clés des services dans
+# backend/.env ; les adresses internes ci-dessous priment sur celles de backend/.env.
+name: vivi
+x-backend: &backend
+  build: ../backend
+  image: vivi-backend
+  restart: unless-stopped
+  env_file: ../backend/.env
+  environment:
+    APP_ENV: prod
+    PUBLIC_URL: https://${DOMAIN}
+    DATABASE_URL: postgresql+asyncpg://vv:${POSTGRES_PASSWORD}@postgres:5432/video_virale
+    REDIS_URL: redis://redis:6379/0
+    # Même adresse pour le code et pour le navigateur : les URLs présignées signent l'hôte. Dans le réseau Docker, ce nom
+    # mène à Caddy (alias ci-dessous), qui relaie vers MinIO.
+    MINIO_ENDPOINT: https://s3.${DOMAIN}
+    MINIO_ACCESS_KEY: vivi
+    MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+  depends_on:
+    migrate: { condition: service_completed_successfully }
+    redis: { condition: service_started }
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment: { POSTGRES_USER: vv, POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}", POSTGRES_DB: video_virale }
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck: { test: ["CMD", "pg_isready", "-U", "vv"], interval: 2s, retries: 30 }
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+  minio:
+    # MinIO ne publie plus d'image sur Docker Hub ni sur quay.io ; celle de Chainguard tourne sans root, mais le volume
+    # neuf appartient à root.
+    image: cgr.dev/chainguard/minio:latest
+    user: root
+    restart: unless-stopped
+    command: server /data
+    environment: { MINIO_ROOT_USER: vivi, MINIO_ROOT_PASSWORD: "${MINIO_ROOT_PASSWORD}" }
+    volumes: [miniodata:/data]
+  migrate:
+    <<: *backend
+    restart: "no"
+    command: alembic upgrade head
+    depends_on: { postgres: { condition: service_healthy } }
+  api:
+    <<: *backend
+  worker:
+    <<: *backend
+    command: arq app.worker.WorkerSettings
+  caddy:
+    build: ../admin
+    restart: unless-stopped
+    environment: { DOMAIN: "${DOMAIN}" }
+    ports: ["80:80", "443:443"]
+    volumes: [./Caddyfile:/etc/caddy/Caddyfile:ro, caddydata:/data]
+    networks: { default: { aliases: ["s3.${DOMAIN}"] } }
+volumes: { pgdata: {}, miniodata: {}, caddydata: {} }

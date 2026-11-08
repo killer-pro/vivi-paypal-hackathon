@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { runningDownstream } from "../../steps";
 import { QUEUE_HINT, QUEUE_LABEL } from "../../studio";
-import { referenceBlocked, type Access } from "../../access";
+import { referenceElementsOf, referenceLimit, type Access } from "../../access";
+import UpgradeNotice from "../UpgradeNotice";
 import { referenceElements, referenceImage, useApi, storyElementsWithoutReference, type ProviderModels, type ReferenceElement, type Step } from "../../api";
 import type { CastMember } from "../../casting";
 import { choiceKey, choiceOf, imageBlocked, imageChoice, imageOptions, type Choice } from "../../models";
@@ -11,6 +12,7 @@ import { useConfirm } from "../../hooks/useConfirm";
 import { Field } from "../ui";
 import PromptEditor from "./PromptEditor";
 import TextArea from "../TextArea";
+import { t } from "../../i18n";
 
 interface Props extends Pick<PanelProps, "flow" | "project" | "locked" | "runLocked"> {
   refStep: Step;
@@ -40,15 +42,15 @@ function ElementCard({ member, prompt, onPrompt, noGenerate, noUpload, queueing,
   return (
     <div className="reference-card">
       <strong>{name}</strong>
-      <span className="muted">{scenes.length ? `Scène${scenes.length > 1 ? "s" : ""} ${scenes.join(", ")}` : "Aucune scène"}</span>
-      <TextArea className="input" rows={4} aria-label={`Prompt de l'image « ${name} »`} value={prompt} onChange={(e) => onPrompt(e.target.value)} />
+      <span className="muted">{scenes.length ? t(scenes.length > 1 ? "Scènes {list}" : "Scène {list}", { list: scenes.join(", ") }) : t("Aucune scène")}</span>
+      <TextArea className="input" rows={4} aria-label={t("Prompt de l'image « {name} »", { name })} value={prompt} onChange={(e) => onPrompt(e.target.value)} />
       <div className="form-actions">
-        <label className="btn btn-small" title="Utiliser une image locale pour cet élément">
-          Importer
+        <label className="btn btn-small" title={t("Utiliser une image locale pour cet élément")}>
+          {t("Importer")}
           <input type="file" accept="image/*" hidden disabled={noUpload} onChange={(e) => e.target.files?.[0] && onUpload(e.target.files[0])} />
         </label>
         <button className="btn btn-small" onClick={onGenerate} disabled={noGenerate} title={queueing ? QUEUE_HINT : undefined}>
-          {queueing ? QUEUE_LABEL : member.imageUrl ? "Régénérer" : "Générer"}
+          {queueing ? QUEUE_LABEL : member.imageUrl ? t("Régénérer") : "Générer"}
         </button>
       </div>
     </div>
@@ -67,7 +69,7 @@ function AddElement({ onAdd }: { onAdd: (name: string, prompt: string) => Promis
     return (
       <div>
         <button className="btn btn-small" onClick={() => setOpen(true)}>
-          Ajouter un élément
+          {t("Ajouter un élément")}
         </button>
       </div>
     );
@@ -80,18 +82,18 @@ function AddElement({ onAdd }: { onAdd: (name: string, prompt: string) => Promis
   };
   return (
     <div className="add-element">
-      <Field label="Nom de l'élément">
-        <input className="input" placeholder="Ex. : Ouvrier de l'Égypte ancienne" maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
+      <Field label={t("Nom de l'élément")}>
+        <input className="input" placeholder={t("Ex. : Ouvrier de l'Égypte ancienne")} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
-      <Field label="Description de l'image">
-        <TextArea className="input" rows={3} placeholder="Ex. : Un ouvrier égyptien au torse nu, pagne de lin, peau hâlée, portant un bloc de pierre" value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+      <Field label={t("Description de l'image")}>
+        <TextArea className="input" rows={3} placeholder={t("Ex. : Un ouvrier égyptien au torse nu, pagne de lin, peau hâlée, portant un bloc de pierre")} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
       </Field>
       <div className="form-actions">
         <button className="btn btn-ghost btn-small" onClick={() => setOpen(false)}>
-          Annuler
+          {t("Annuler")}
         </button>
         <button className="btn btn-small" onClick={submit} disabled={!name.trim() || !prompt.trim()}>
-          Ajouter
+          {t("Ajouter")}
         </button>
       </div>
     </div>
@@ -109,9 +111,9 @@ export default function ReferenceSection({ flow, project, locked, runLocked, ref
   const generate = (replaces: boolean, what: string, run: () => void) =>
     replaces
       ? confirm({
-          title: `Régénérer ${what} ?`,
-          message: "L'image actuelle sera remplacée ; la génération est facturée selon le générateur choisi.",
-          confirmLabel: "Régénérer",
+          title: t("Régénérer {what} ?", { what }),
+          message: t("L'image actuelle sera remplacée ; la génération est facturée selon le générateur choisi."),
+          confirmLabel: t("Régénérer"),
           onConfirm: run,
         })
       : run();
@@ -140,17 +142,21 @@ export default function ReferenceSection({ flow, project, locked, runLocked, ref
       imageDefault,
     );
   const blocked = imageBlocked(models.data?.image, models.error, choice);
-  // Image de référence réservée à l'abonnement : les contrôles restent visibles, désactivés, avec le motif.
-  const subscriptionLock = referenceBlocked(useApi<Access>("/access").data);
+  // Nombre d'éléments limité par le forfait : les contrôles restent visibles, désactivés, avec le motif. Remplacer
+  // l'image d'un élément qui en a déjà une reste permis.
+  const access = useApi<Access>("/access").data;
+  const existing = referenceElementsOf(project.assets);
+  const subscriptionLock = referenceLimit(access, Math.max(elements.length, 1));
+  const elementLock = (id: string) => referenceLimit(access, new Set([...existing, id]).size);
 
   return (
     // Repliée : les images elles-mêmes sont dans le bandeau du casting, ce volet ne sert qu'à les modifier.
     <details className="advanced">
       <summary>
-        Image de référence
-        {elements.length > 0 && <span className="advanced-badge">{made}/{elements.length} générées</span>}
-        {elements.length === 0 && image && <span className="advanced-badge">générée</span>}
-        {!image && made === 0 && refStep.status === "pending" && <span className="advanced-badge muted"> facultative</span>}
+        {t("Image de référence")}
+        {elements.length > 0 && <span className="advanced-badge">{made}/{elements.length} {t("générées")}</span>}
+        {elements.length === 0 && image && <span className="advanced-badge">{t("générée")}</span>}
+        {!image && made === 0 && refStep.status === "pending" && <span className="advanced-badge muted">{t(" facultative")}</span>}
       </summary>
       <div className="advanced-body">
         {elements.length > 0 ? (
@@ -165,8 +171,8 @@ export default function ReferenceSection({ flow, project, locked, runLocked, ref
                       member={member}
                       prompt={promptOf(e)}
                       onPrompt={(value) => setEdited((p) => ({ ...p, [e.id]: value }))}
-                      noGenerate={runLocked || Boolean(blocked) || Boolean(subscriptionLock)}
-                      noUpload={flow.busy || refStep.status === "running" || Boolean(subscriptionLock)}
+                      noGenerate={runLocked || Boolean(blocked) || Boolean(elementLock(e.id))}
+                      noUpload={flow.busy || refStep.status === "running" || Boolean(elementLock(e.id))}
                       queueing={queueing}
                       onGenerate={() =>
                         generate(Boolean(member.imageUrl), `l'image « ${member.name} »`, () =>
@@ -182,12 +188,12 @@ export default function ReferenceSection({ flow, project, locked, runLocked, ref
           </>
         ) : (
           <>
-            {image && <img className="frame-9x16 reference-image" src={image.url} alt="Image de référence générée" />}
+            {image && <img className="frame-9x16 reference-image" src={image.url} alt={t("Image de référence générée")} />}
             <PromptEditor
-              title="Prompt de l'image"
-              fieldLabel="Description du style visuel"
-              placeholder="Par défaut : le thème du projet, format vertical, style cinématographique"
-              instructionPlaceholder='Ex. : "Style film noir années 50", "Tons chauds, lumière naturelle"...'
+              title={t("Prompt de l'image")}
+              fieldLabel={t("Description du style visuel")}
+              placeholder={t("Par défaut : le thème du projet, format vertical, style cinématographique")}
+              instructionPlaceholder={t('Ex. : "Style film noir années 50", "Tons chauds, lumière naturelle"...')}
               rows={3}
               value={prompt}
               original={saved}
@@ -199,7 +205,7 @@ export default function ReferenceSection({ flow, project, locked, runLocked, ref
 
         {elements.length < MAX_REFERENCE_ELEMENTS && fromStory.length > 0 && (
           <div className="story-elements">
-            <span className="muted">Éléments de l'histoire sans image de référence</span>
+            <span className="muted">{t("Éléments de l'histoire sans image de référence")}</span>
             <div className="story-elements-list">
               {fromStory.map((e) => (
                 <button key={e.id} className="btn btn-small" disabled={flow.busy} title={e.prompt} onClick={() => flow.addReference(e.name, e.prompt, e.id)}>
@@ -211,7 +217,7 @@ export default function ReferenceSection({ flow, project, locked, runLocked, ref
         )}
         {elements.length < MAX_REFERENCE_ELEMENTS && <AddElement onAdd={flow.addReference} />}
 
-        <Field label="Générateur d'image">
+        <Field label={t("Générateur d'image")}>
           <select className="input" value={choiceKey(choice)} onChange={(e) => setPick(choiceOf(e.target.value))}>
             {imageOptions(models.data?.image, choice).map((o) => (
               <option key={o.value} value={o.value}>
@@ -221,29 +227,29 @@ export default function ReferenceSection({ flow, project, locked, runLocked, ref
           </select>
         </Field>
 
-        {subscriptionLock && <p className="muted">{subscriptionLock}</p>}
+        {subscriptionLock && <UpgradeNotice reason={subscriptionLock} />}
         {blocked && (
           <p className="muted">
-            {blocked} <Link to="/providers">Ouvrir les Réglages</Link>
+            {blocked} <Link to="/providers">{t("Ouvrir les Réglages")}</Link>
           </p>
         )}
         <div className="form-actions">
           {refStep.status === "pending" && (
             <button className="btn btn-ghost" onClick={() => flow.approve("reference")} disabled={locked || queueing}>
-              Ignorer cette étape
+              {t("Ignorer cette étape")}
             </button>
           )}
           <button
             className="btn btn-primary"
             onClick={() =>
-              generate(elements.length ? made > 0 : Boolean(image), elements.length ? "toutes les images" : "l'image", () =>
+              generate(elements.length ? made > 0 : Boolean(image), elements.length ? t("toutes les images") : t("l'image"), () =>
                 flow.run("reference", undefined, { params: { ...(elements.length ? { prompts: allPrompts } : { prompt }), ...choice } }),
               )
             }
             disabled={runLocked || Boolean(blocked) || Boolean(subscriptionLock)}
             title={queueing ? QUEUE_HINT : undefined}
           >
-            {queueing ? QUEUE_LABEL : elements.length ? (made ? "Régénérer toutes les images" : "Générer toutes les images") : image ? "Régénérer l'image" : "Générer l'image"}
+            {queueing ? QUEUE_LABEL : elements.length ? (made ? t("Régénérer toutes les images") : t("Générer toutes les images")) : image ? t("Régénérer l'image") : t("Générer l'image")}
           </button>
         </div>
       </div>

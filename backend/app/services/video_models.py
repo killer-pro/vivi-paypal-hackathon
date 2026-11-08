@@ -16,25 +16,26 @@ class ModelRefused(HTTPException):
 
 async def video_cards(registry: ProviderRegistry, providers: list[str] | None = None) -> list[dict]:
     """Cartes des modèles vidéo (de `providers`, par défaut tous), dans l'ordre des providers puis de leurs modèles :
-    profil local (notes vitesse/qualité, durée par clip) ou modèle cloud (coût d'un clip), avec sa disponibilité ;
-    `recommended` : le profil local par défaut (`DEFAULT_PROFILE`). Ne lève pas si un service est injoignable (ses
-    cartes sont grisées)."""
+    profil (notes vitesse/qualité), avec sa durée par clip en local ou son coût d'un clip sur Comfy Cloud, ou modèle
+    cloud (coût d'un clip), avec sa disponibilité ; `recommended` : le profil local par défaut (`DEFAULT_PROFILE`). Ne
+    lève pas si un service est injoignable (ses cartes sont grisées)."""
     cards = []
     for name in providers or registry.VIDEO_PROVIDER_NAMES:
         video = await registry.video(name)
         availability = await video.availability()
         for model in video.models:
             profile = PROFILES_BY_ID.get(model)
+            local = profile if name == "comfyui" else None  # profil exécuté chez nous : chiffré en durée, pas en dollars
             state = availability[model]
             cards.append({
                 "provider": name, "id": model,
                 "name": profile.name if profile else model,
                 "description": profile.description if profile else "",
                 "speed": profile and profile.speed, "quality": profile and profile.quality,
-                "minutes_per_clip": profile and profile.minutes_per_clip,
-                "cost_usd_per_clip": None if profile else video.estimate_cost(model, CARD_DURATION_S),
+                "minutes_per_clip": local and local.minutes_per_clip,
+                "cost_usd_per_clip": None if local else video.estimate_cost(model, CARD_DURATION_S),
                 "available": state.available, "reason": state.reason,
-                "recommended": profile is not None and profile.id == DEFAULT_PROFILE,
+                "recommended": local is not None and local.id == DEFAULT_PROFILE,
             })
     return cards
 

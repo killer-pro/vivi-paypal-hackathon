@@ -1,5 +1,6 @@
 import json
 
+import httpx
 import pytest
 from sqlalchemy import select
 
@@ -8,10 +9,11 @@ from app.config import settings
 from app.main import app
 from app.models import CreditBalance
 from app.services.paypal_client import FakePayPal, PayPalClient, PayPalError, get_paypal
+from tests.test_billing_api import config_with
 
-CONFIG = {"subscription": {"price_id": "", "credits": 400, "label": "19 $ par mois"},
-          "packs": [{"id": "pack200", "price_id": "", "credits": 200, "label": "10 $", "paypal_amount": "10.00"},
-                    {"id": "pack500", "price_id": "", "credits": 500, "label": "24 $"}]}
+CONFIG = config_with(tier={"paypal_plan_id": "P-VIVI", "credits": 400}, tiers={"creator": {"paypal_plan_id": "P-CREATOR"}},
+                     packs=[{"id": "pack200", "price_id": "", "credits": 200, "label": "10 $", "paypal_amount": "10.00"},
+                            {"id": "pack500", "price_id": "", "credits": 500, "label": "24 $"}])
 
 
 @pytest.fixture
@@ -127,3 +129,185 @@ async def test_fake_mode_has_a_default_voice_so_a_fresh_install_runs_end_to_end(
     assert await AppSettings(session).get("default_voice_id") == "fake-voice"
     monkeypatch.setattr(settings, "fake_providers", False)
     assert await AppSettings(session).get("default_voice_id") == ""
+
+
+# --- Abonnement (PayPal Subscriptions) ---
+
+async def subscription_balance(session, user) -> int:
+    row = await session.scalar(select(CreditBalance).where(CreditBalance.user_id == user.id))
+    return row.subscription if row else 0
+
+
+async def subscribe(c, paypal, cycles: int = 1, tier_id: str = "starter") -> str:
+    """Crée l'abonnement par l'API et simule l'approbation du client chez PayPal ; renvoie l'identifiant d'abonnement."""
+    r = await c.post("/api/billing/paypal/subscription", json={"tier_id": tier_id})
+    assert r.status_code == 200
+    sub_id = r.json()["url"].rsplit("=", 1)[1]
+    paypal.approve_subscription(sub_id, cycles)
+    return sub_id
+
+
+def sale_event(sub_id: str) -> dict:
+    return {"id": f"WH-{sub_id}", "event_type": "PAYMENT.SALE.COMPLETED", "resource": {"id": "SALE-1", "billing_agreement_id": sub_id}}
+
+
+async def test_subscribing_then_confirming_grants_the_monthly_quota_once(api_as, make_user, paypal, session):
+    user = await make_user("a@x.fr")
+    c = await api_as(user)
+    sub_id = await subscribe(c, paypal)
+    assert paypal.calls[0] == ("subscribe", "P-VIVI", str(user.id))
+    first = await c.post("/api/billing/paypal/subscription/confirm", json={"subscription_id": sub_id})
+    again = await c.post("/api/billing/paypal/subscription/confirm", json={"subscription_id": sub_id})
+    assert first.json() == {"activated": True, "credited": 400} and again.json() == {"activated": True, "credited": 0}
+    assert await subscription_balance(session, user) == 400
+    assert (await c.get("/api/billing")).json()["subscribed"] is True
+
+
+async def test_confirming_before_the_first_payment_credits_nothing(api_as, make_user, paypal, session):
+    c = await api_as(user := await make_user("a@x.fr"))
+    sub_id = await subscribe(c, paypal, cycles=0)
+    r = await c.post("/api/billing/paypal/subscription/confirm", json={"subscription_id": sub_id})
+    assert r.json() == {"activated": False, "credited": 0} and await subscription_balance(session, user) == 0
+
+
+async def test_renewal_webhook_resets_the_quota_once_per_cycle_and_dedupes_with_the_confirm(api_as, make_user, paypal, session):
+    c = await api_as(user := await make_user("a@x.fr"))
+    sub_id = await subscribe(c, paypal)
+    await c.post("/api/billing/paypal/subscription/confirm", json={"subscription_id": sub_id})
+    anon = await api_as(None)
+    assert (await anon.post("/api/paypal/webhook", json=sale_event(sub_id))).json()["credited"] == 0  # même cycle que la confirmation
+    paypal.approve_subscription(sub_id, cycles=2)  # un mois plus tard
+    assert (await anon.post("/api/paypal/webhook", json=sale_event(sub_id))).json()["credited"] == 400
+    assert (await anon.post("/api/paypal/webhook", json=sale_event(sub_id))).json()["credited"] == 0
+    assert await subscription_balance(session, user) == 400
+
+
+async def test_the_webhook_alone_activates_a_client_who_closed_the_tab(api_as, make_user, paypal, session):
+    c = await api_as(user := await make_user("a@x.fr"))
+    sub_id = await subscribe(c, paypal)
+    r = await (await api_as(None)).post("/api/paypal/webhook", json=sale_event(sub_id))
+    assert r.json()["credited"] == 400 and await subscription_balance(session, user) == 400
+
+
+async def test_cancelling_keeps_the_paid_period_and_frees_the_subscription(api_as, make_user, paypal, session):
+    c = await api_as(await make_user("a@x.fr"))
+    sub_id = await subscribe(c, paypal)
+    await c.post("/api/billing/paypal/subscription/confirm", json={"subscription_id": sub_id})
+    assert (await c.get("/api/billing")).json()["paypal_cancellable"] is True
+    assert (await c.post("/api/billing/paypal/subscription/cancel")).json() == {"cancelled": True}
+    assert ("cancel", sub_id) in paypal.calls
+    cancelled = {"id": "WH-C", "event_type": "BILLING.SUBSCRIPTION.CANCELLED", "resource": {"id": sub_id}}
+    await (await api_as(None)).post("/api/paypal/webhook", json=cancelled)
+    body = (await c.get("/api/billing")).json()
+    assert body["subscribed"] is True and body["paypal_cancellable"] is False  # période payée conservée, plus de renouvellement
+
+
+async def test_subscribe_to_creator_sets_plan_and_quota(api_as, make_user, paypal, session):
+    user = await make_user("a@x.fr")
+    c = await api_as(user)
+    sub_id = await subscribe(c, paypal, tier_id="creator")
+    assert paypal.calls[0] == ("subscribe", "P-CREATOR", str(user.id))
+    r = await c.post("/api/billing/paypal/subscription/confirm", json={"subscription_id": sub_id})
+    assert r.json() == {"activated": True, "credited": 3000}
+    await session.refresh(user)
+    assert user.plan_id == "creator" and await subscription_balance(session, user) == 3000
+    body = (await c.get("/api/billing")).json()
+    assert body["current_tier"] == "creator" and body["subscribed"] is True
+
+
+async def test_renewal_keeps_tier_quota(api_as, make_user, paypal, session):
+    c = await api_as(user := await make_user("a@x.fr"))
+    sub_id = await subscribe(c, paypal, tier_id="creator")
+    await c.post("/api/billing/paypal/subscription/confirm", json={"subscription_id": sub_id})
+    paypal.approve_subscription(sub_id, cycles=2)
+    assert (await (await api_as(None)).post("/api/paypal/webhook", json=sale_event(sub_id))).json()["credited"] == 3000
+    await session.refresh(user)
+    assert user.plan_id == "creator" and await subscription_balance(session, user) == 3000
+
+
+async def test_unknown_paypal_plan_ignored(api_as, make_user, paypal, session):
+    from app.services import payments
+    user = await make_user("a@x.fr")
+    subscription = {"id": "I-X", "plan_id": "P-AUTRE", "custom_id": str(user.id), "status": "ACTIVE",
+                    "billing_info": {"cycle_executions": [{"tenure_type": "REGULAR", "cycles_completed": 1}]}}
+    assert await payments.apply_paypal_subscription(session, subscription, AppSettings(session)) == 0
+    assert user.plan_id is None and await subscription_balance(session, user) == 0
+
+
+async def test_unknown_tier_404(api_as, make_user, paypal):
+    r = await (await api_as(await make_user("a@x.fr"))).post("/api/billing/paypal/subscription", json={"tier_id": "gold"})
+    assert r.status_code == 404 and paypal.calls == []
+
+
+@pytest.mark.parametrize("setup", ["no_plan", "subscribed"])
+async def test_tier_without_paypal_plan_409(api_as, make_user, paypal, session, setup):
+    c = await api_as(await make_user("a@x.fr"))
+    if setup == "subscribed":
+        await c.post("/api/billing/paypal/subscription/confirm", json={"subscription_id": await subscribe(c, paypal)})
+    tier = "pro" if setup == "no_plan" else "creator"  # Pro n'a pas de plan PayPal
+    assert (await c.post("/api/billing/paypal/subscription", json={"tier_id": tier})).status_code == 409
+
+
+async def test_confirming_someone_elses_subscription_is_refused(api_as, make_user, paypal, session):
+    owner, thief = await make_user("a@x.fr"), await make_user("b@x.fr")
+    sub_id = await subscribe(await api_as(owner), paypal)
+    r = await (await api_as(thief)).post("/api/billing/paypal/subscription/confirm", json={"subscription_id": sub_id})
+    assert r.status_code == 403 and await subscription_balance(session, owner) == 0 == await subscription_balance(session, thief)
+
+
+@pytest.mark.parametrize("sub_id", ["../../v1/x", "I 1", "A/B", "x" * 65])
+async def test_subscription_ids_that_could_alter_the_request_path_are_refused(api_as, make_user, paypal, sub_id):
+    c = await api_as(await make_user("a@x.fr"))
+    assert (await c.post("/api/billing/paypal/subscription/confirm", json={"subscription_id": sub_id})).status_code == 422
+
+
+async def test_paypal_subscription_is_offered_only_with_a_plan_and_credentials(api_as, make_user, paypal, session, monkeypatch):
+    monkeypatch.setattr(settings, "fake_providers", False)
+    c = await api_as(await make_user("a@x.fr"))
+    assert [t["paypal_purchasable"] for t in (await c.get("/api/billing")).json()["tiers"]] == [False, False, False]
+    app_settings = AppSettings(session)
+    await app_settings.set("paypal_client_id", "id")
+    await app_settings.set("paypal_client_secret", "secret")
+    assert [t["paypal_purchasable"] for t in (await c.get("/api/billing")).json()["tiers"]] == [True, True, False]
+
+
+async def test_the_real_client_creates_a_product_then_a_monthly_plan():
+    seen: list[tuple[str, dict]] = []
+
+    def respond(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content) if request.content and request.url.path != "/v1/oauth2/token" else {}
+        seen.append((request.url.path, body))
+        answers = {"/v1/oauth2/token": {"access_token": "T", "expires_in": 3600}, "/v1/catalogs/products": {"id": "PROD-1"},
+                   "/v1/billing/plans": {"id": "P-NEW"}}
+        return httpx.Response(201, json=answers[request.url.path])
+
+    client = PayPalClient("id", "secret", "", http=httpx.AsyncClient(transport=httpx.MockTransport(respond)))
+    assert await client.create_monthly_plan(name="Vivi mensuel", amount="19.00") == "P-NEW"
+    plan = dict(seen)["/v1/billing/plans"]
+    assert plan["product_id"] == "PROD-1"
+    assert plan["billing_cycles"][0]["pricing_scheme"]["fixed_price"] == {"value": "19.00", "currency_code": "USD"}
+
+
+def legacy_subscription(user, status="ACTIVE", cycles=2) -> dict:
+    """Abonnement au plan unique d'avant les forfaits : son plan n'est plus dans `billing_config`."""
+    return {"id": "I-OLD", "plan_id": "P-ANCIEN", "custom_id": str(user.id), "status": status,
+            "billing_info": {"cycle_executions": [{"tenure_type": "REGULAR", "cycles_completed": cycles}],
+                             "next_billing_time": "2030-01-01T00:00:00Z"}}
+
+
+async def test_legacy_subscriber_renewal_is_credited(make_user, paypal, session):
+    from app.services import payments
+    user = await make_user("a@x.fr")
+    user.paypal_subscription_id = "I-OLD"
+    await session.commit()
+    assert await payments.apply_paypal_subscription(session, legacy_subscription(user), AppSettings(session)) == 400
+    assert user.plan_id == "starter" and user.subscription_ends_at.year == 2030
+
+
+async def test_legacy_subscription_cancellation_frees_it(make_user, paypal, session):
+    from app.services import payments
+    user = await make_user("a@x.fr")
+    user.paypal_subscription_id = "I-OLD"
+    await session.commit()
+    await payments.apply_paypal_subscription(session, legacy_subscription(user, "CANCELLED"), AppSettings(session))
+    assert user.paypal_subscription_id is None

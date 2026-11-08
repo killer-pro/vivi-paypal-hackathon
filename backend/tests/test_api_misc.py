@@ -89,13 +89,13 @@ async def test_models_endpoint_returns_cards(api, real_providers, monkeypatch):
     assert [c["id"] for c in local] == ["fast", "balanced", "precision", "max"]
     assert local[0] == {"provider": "comfyui", "id": "fast", "name": "Rapide",
                         "description": "Wan 2.2 14B, 320×576 : le meilleur compromis.", "speed": 4,
-                        "quality": 3.5, "minutes_per_clip": 5, "cost_usd_per_clip": None, "available": True,
+                        "quality": 3.5, "minutes_per_clip": 5, "cost_usd_per_clip": None, "credits_per_clip": None, "available": True,
                         "reason": "", "recommended": True, "locked": False, "locked_reason": None}
     assert [c["id"] for c in data["video"] if c["recommended"]] == ["fast"]  # le profil par défaut seulement
     assert local[3]["available"] is False and local[3]["reason"] == "Modèle manquant : ESRGAN/4x-UltraSharp.pth"
     kling = next(c for c in data["video"] if c["provider"] == "fal" and c["id"] == "kling")
     assert kling == {"provider": "fal", "id": "kling", "name": "kling", "description": "", "speed": None,
-                     "quality": None, "minutes_per_clip": None, "cost_usd_per_clip": 1.4, "available": False,
+                     "quality": None, "minutes_per_clip": None, "cost_usd_per_clip": 1.4, "credits_per_clip": None, "available": False,
                      "reason": FAL_KEY_MISSING, "recommended": False, "locked": False, "locked_reason": None}
     assert {c["id"] for c in data["video"] if c["provider"] == "fal"} == {"kling", "wan", "ltx"}
     assert ("fal", "flux") in [(c["provider"], c["id"]) for c in data["image"]] and "comfyui_workflows" not in data

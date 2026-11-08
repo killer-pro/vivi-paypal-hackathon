@@ -6,6 +6,8 @@ import {
   choiceOf,
   imageBlocked,
   imageChoice,
+  availableFirst,
+  groupOrder,
   imageOptions,
   launchBlocked,
   pickable,
@@ -23,6 +25,7 @@ const card = (over: Partial<ModelCard>): ModelCard => ({
   quality: 3.5,
   minutes_per_clip: 5,
   cost_usd_per_clip: null,
+  credits_per_clip: null,
   available: true,
   reason: "",
   recommended: false,
@@ -50,6 +53,11 @@ describe("clipCost", () => {
   });
   it("donne le coût d'un clip cloud", () => {
     expect(clipCost(cloud(0.28))).toBe("≈ 0,28\u00a0$ par clip");
+  });
+  it("cost shows credits : un client voit le prix en crédits, jamais en dollars", () => {
+    const client = card({ provider: "comfycloud", minutes_per_clip: null, cost_usd_per_clip: null, credits_per_clip: 7 });
+    expect(clipCost(client)).toBe("≈ 7 crédits par clip"); // clip de 3 s : le devis du bouton suit la durée des scènes
+    expect(totalEstimate(client, 10)).toBe("≈ 70 crédits pour 10 scènes");
   });
 });
 
@@ -82,9 +90,9 @@ describe("pickable", () => {
     const noMax = [...cards, card({ id: "max", available: false })];
     expect(pickable(noMax, { provider: "comfyui", model: "workflow" })).toEqual({ provider: "comfyui", model: "fast" });
   });
-  it("ne bascule jamais d'un choix local vers une carte payante", () => {
-    const comfyDown = [card({ id: "fast", available: false }), card({ id: "balanced", available: false }), cloud(0.28)];
-    expect(pickable(comfyDown, { provider: "comfyui", model: "fast" })).toEqual({ provider: "comfyui", model: "fast" });
+  it("pickable picks first available when none recommended", () => {
+    const comfyDown = [card({ id: "fast", available: false, recommended: true }), card({ id: "balanced", available: false }), cloud(0.28)];
+    expect(pickable(comfyDown, { provider: "comfyui", model: "fast" })).toEqual({ provider: "fal", model: "kling" });
   });
   it("ramène un choix indisponible sur la première carte disponible si la recommandée ne l'est pas", () => {
     const down = [card({ id: "fast", available: false }), card({ id: "balanced" }), cards[2]];
@@ -211,12 +219,16 @@ describe("modèles d'image (image de référence)", () => {
       { value: "fal/flux", label: "flux (fal.ai, indisponible)" },
     ]);
     expect(imageOptions(undefined, fal)).toEqual([{ value: "fal/flux", label: "flux (fal.ai)" }]);
+    expect(imageOptions([flux({ available: false }), image()], fal).map((o) => o.value)).toEqual([
+      "gemini/gemini-3.1-flash-image",
+      "fal/flux",
+    ]); // disponibles d'abord
     expect(choiceOf("fal/flux")).toEqual(fal);
   });
 });
 
 describe("profil réservé à l'abonnement", () => {
-  const reason = "Réservé à l'abonnement : le profil Précision";
+  const reason = "Réservé au forfait Starter : le profil Précision";
   const locked = card({ id: "precision", name: "Précision", locked: true, locked_reason: reason });
 
   it("n'est jamais choisi automatiquement, même s'il est le choix enregistré", () => {
@@ -228,5 +240,31 @@ describe("profil réservé à l'abonnement", () => {
   });
   it("s'affiche avec son motif, sans « Indisponible »", () => {
     expect(cardNotice(locked)).toEqual({ kind: "locked", text: reason });
+  });
+});
+
+describe("fournisseurs disponibles d'abord", () => {
+  it("le motif neutre d'un client n'est pas répété", () => {
+    expect(cardNotice(card({ available: false, reason: "Indisponible pour le moment" }))?.text).toBe("Indisponible pour le moment");
+  });
+  it("availableFirst keeps order within each group", () => {
+    const items = [
+      { id: "a", available: false },
+      { id: "b", available: true },
+      { id: "c", available: false },
+      { id: "d", available: true },
+    ];
+    expect(availableFirst(items).map((i) => i.id)).toEqual(["b", "d", "a", "c"]);
+  });
+  it("groups with available cards come first", () => {
+    const cards = [
+      card({ provider: "fal", id: "kling", available: false }),
+      card({ provider: "comfyui", id: "fast", available: false, recommended: true }),
+      card({ provider: "comfycloud", id: "fast" }),
+      card({ provider: "comfycloud", id: "max" }),
+    ];
+    expect(groupOrder(cards)).toEqual(["comfycloud", "comfyui", "fal"]);
+    // à disponibilité égale, le groupe recommandé passe devant
+    expect(groupOrder([card({ provider: "fal", id: "k" }), card({ provider: "comfyui", recommended: true })])).toEqual(["comfyui", "fal"]);
   });
 });

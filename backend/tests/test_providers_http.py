@@ -8,10 +8,10 @@ import pytest
 
 from app.providers.base import Availability, ProviderError, plain_prompt, split_prompt
 from app.providers.claude import PRICE_IN_PER_M, PRICE_OUT_PER_M, ClaudeLLM
-from app.providers.comfyui import AVAILABILITY_TIMEOUT_S, MISSING_POLLS, ComfyUIProvider, frames_for
+from app.providers.comfyui import AVAILABILITY_TIMEOUT_S, MISSING_POLLS, ComfyUIImage, ComfyUIProvider, frames_for
 from app.providers.elevenlabs import ElevenLabsVoice
 from app.providers.fal import FAL_KEY_MISSING, FalProvider
-from app.providers.profiles import PROFILES, required_files
+from app.providers.profiles import PROFILES, flux_files, required_files
 
 
 def client(handler):
@@ -173,6 +173,39 @@ async def test_comfyui_timeout_cancels_its_prompt(running, pending, path, body):
         await asyncio.wait_for(p.generate("x", model="fast", duration_s=2), 0.1)
     assert comfy.posted(path) == [body]
     assert comfy.posted("/interrupt" if path == "/queue" else "/queue") == []  # jamais le prompt d'un autre
+
+
+async def test_comfyui_image_generates_a_reference_and_keeps_models_until_release():
+    comfy = FakeComfy(history=done(KEYFRAME_OUT, KEYFRAME_OUT))
+    image = ComfyUIImage(ComfyUIProvider("http://c", client(comfy), poll_interval=0))
+    for _ in range(2):
+        r = await image.generate("un chat", model="flux-dev")
+        assert (r.data, r.content_type, r.cost_usd) == (b"PNGDATA", "image/png", 0.0)
+    assert len(comfy.workflows()) == 2 and comfy.posted("/free") == []  # Flux reste chargé entre deux images
+    await image.release()
+    assert comfy.posted("/free") == [{"unload_models": True, "free_memory": True}]
+
+
+async def test_comfyui_image_unreachable_is_a_non_retryable_provider_error():
+    image = ComfyUIImage(ComfyUIProvider("http://c", client(unreachable)))
+    with pytest.raises(ProviderError, match="injoignable") as e:
+        await image.generate("x", model="flux-dev")
+    assert not e.value.retryable
+
+
+def test_reference_image_uses_the_flux_dev_files_of_the_precision_profile():
+    from app.providers.profiles import get_profile
+
+    assert all(f in required_files(get_profile("precision")) for f in flux_files())  # même graphe, mêmes fichiers
+    assert flux_files(kontext=True) != flux_files()
+
+
+async def test_comfyui_image_availability_names_the_missing_flux_file():
+    ok = ComfyUIImage(ComfyUIProvider("http://c", client(FakeComfy(info=object_info(flux_files())))))
+    assert (await ok.image_availability())["flux-dev"].available
+    missing = ComfyUIImage(ComfyUIProvider("http://c", client(FakeComfy(info=object_info([])))))
+    report = (await missing.image_availability())["flux-dev"]
+    assert not report.available and "Modèle manquant" in report.reason
 
 
 async def test_comfyui_keyframe_stage_is_cancelled_too():

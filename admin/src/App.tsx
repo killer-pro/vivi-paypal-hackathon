@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import Landing from "./pages/Landing";
 import Costs from "./pages/Costs";
+import Plans from "./pages/Plans";
 import Credits from "./pages/Credits";
 import CustomerDetail from "./pages/CustomerDetail";
 import Customers from "./pages/Customers";
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="providers" element={<Providers />} />
           <Route path="costs" element={<Costs />} />
           <Route path="credits" element={<Credits />} />
+          <Route path="plans" element={<Plans />} />
           <Route path="clients" element={<Customers />} />
           <Route path="clients/:id" element={<CustomerDetail />} />
           <Route path="pricing" element={<Pricing />} />

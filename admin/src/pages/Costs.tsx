@@ -8,8 +8,9 @@ import { dateTime, plainTitle, usd } from "../format";
 import { assistStepLabel } from "../assist";
 import { STEP_LABELS, type StepName } from "../steps";
 import "./Costs.css";
+import { locale, t } from "../i18n";
 
-const seconds = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 1 });
+const seconds = new Intl.NumberFormat(locale, { maximumFractionDigits: 1 });
 
 type Filter = "project_id" | "provider";
 
@@ -47,13 +48,13 @@ export default function Costs() {
   return (
     <>
       <header className="page-head">
-        <h1>Coûts</h1>
+        <h1>{t("Coûts")}</h1>
       </header>
 
       <div className="cost-filters">
-        <Field label="Projet">
+        <Field label={t("Projet")}>
           <select className="input" value={projectId} onChange={(e) => setFilter("project_id", e.target.value)}>
-            <option value="">Tous les projets</option>
+            <option value="">{t("Tous les projets")}</option>
             {projects?.map((p) => (
               <option key={p.id} value={p.id}>
                 {plainTitle(p.title)}
@@ -63,7 +64,7 @@ export default function Costs() {
         </Field>
         <Field label="Provider">
           <select className="input" value={provider} onChange={(e) => setFilter("provider", e.target.value)}>
-            <option value="">Tous les providers</option>
+            <option value="">{t("Tous les providers")}</option>
             {providers.map((name) => (
               <option key={name} value={name}>
                 {name}
@@ -79,58 +80,58 @@ export default function Costs() {
               setParams({});
             }}
           >
-            Effacer les filtres
+            {t("Effacer les filtres")}
           </button>
         )}
       </div>
 
       {error && <ErrorState message={error} onRetry={reload} />}
-      {!error && !data && <p className="muted">Chargement…</p>}
+      {!error && !data && <p className="muted">{t("Chargement…")}</p>}
 
       {!error && data && (
         <>
-          <section className="cost-summary" aria-label="Synthèse">
+          <section className="cost-summary" aria-label={t("Synthèse")}>
             <div className="cost-total">
-              <span className="muted">Dépensé{projectId || provider ? " (filtré)" : ""}</span>
+              <span className="muted">{projectId || provider ? t("Dépensé (filtré)") : t("Dépensé")}</span>
               <strong>{usd.format(data.total_usd)}</strong>
               <span className="muted">
                 {data.calls.length < data.calls_total
-                  ? `${data.calls.length} derniers appels affichés sur ${data.calls_total}`
-                  : `${data.calls_total} appels`}
-                {failures > 0 && `, dont ${failures} en échec`}
+                  ? t("{n} derniers appels affichés sur {total}", { n: data.calls.length, total: data.calls_total })
+                  : t("{n} appels", { n: data.calls_total })}
+                {failures > 0 && t(", dont {n} en échec", { n: failures })}
               </span>
             </div>
             <Breakdown
-              title="Par provider"
+              title={t("Par provider")}
               rows={breakdown(data.by_provider, (k) => k)}
               active={provider}
               onSelect={(k) => setFilter("provider", k)}
             />
             <Breakdown
-              title="Par projet"
+              title={t("Par projet")}
               rows={breakdown(data.by_project, titleOf)}
               active={projectId}
               onSelect={(k) => setFilter("project_id", k)}
             />
           </section>
 
-          <h2 className="calls-title">Appels</h2>
+          <h2 className="calls-title">{t("Appels")}</h2>
           {data.calls.length === 0 ? (
             <p className="muted">
-              Aucun appel facturé{projectId || provider ? " pour ces filtres" : " : lancez une génération depuis un projet"}.
+              {projectId || provider ? t("Aucun appel facturé pour ces filtres.") : t("Aucun appel facturé : lancez une génération depuis un projet.")}
             </p>
           ) : (
             <div className="table-wrap">
               <table className="table calls-table">
                 <thead>
                   <tr>
-                    <th>Date</th>
-                    <th>Projet</th>
-                    <th>Étape</th>
-                    <th>Provider et modèle</th>
-                    <th className="num">Durée</th>
-                    <th className="num">Coût</th>
-                    <th>Statut</th>
+                    <th>{t("Date")}</th>
+                    <th>{t("Projet")}</th>
+                    <th>{t("Étape")}</th>
+                    <th>{t("Provider et modèle")}</th>
+                    <th className="num">{t("Durée")}</th>
+                    <th className="num">{t("Coût")}</th>
+                    <th>{t("Statut")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -139,7 +140,7 @@ export default function Costs() {
                       <td className="nowrap">{dateTime.format(new Date(c.created_at))}</td>
                       <td>
                         {c.project_id === null ? (
-                          <span className="muted">Aucun</span>
+                          <span className="muted">{t("Aucun")}</span>
                         ) : (
                           <Link to={`/projects/${c.project_id}`}>{titleOf(String(c.project_id))}</Link>
                         )}
@@ -153,7 +154,7 @@ export default function Costs() {
                       <td className="num">{usd.format(c.cost_usd)}</td>
                       <td>
                         <span className={`status-badge st-${c.status === "ok" ? "approved" : "failed"}`}>
-                          {c.status === "ok" ? "Réussi" : "Échec"}
+                          {c.status === "ok" ? t("Réussi") : t("Échec")}
                         </span>
                         {c.error && <div className="error call-error">{c.error}</div>}
                       </td>
@@ -203,7 +204,7 @@ function Breakdown({
     <div className="breakdown">
       <h2>{title}</h2>
       {rows.length === 0 ? (
-        <p className="muted">Aucune dépense.</p>
+        <p className="muted">{t("Aucune dépense.")}</p>
       ) : (
         <ul>
           {rows.map((r) => (
@@ -211,7 +212,7 @@ function Breakdown({
               <button
                 className="breakdown-row"
                 aria-pressed={active === r.key}
-                title={`${r.label} : ${usd.format(r.usd)} (${formatShare(r.share)}). Cliquer pour filtrer.`}
+                title={t("{label} : {cost} ({share}). Cliquer pour filtrer.", { label: r.label, cost: usd.format(r.usd), share: formatShare(r.share) })}
                 onClick={() => onSelect(active === r.key ? "" : r.key)}
               >
                 <span className="breakdown-label">{r.label}</span>

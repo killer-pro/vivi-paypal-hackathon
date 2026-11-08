@@ -6,6 +6,7 @@ import { ErrorState, Field } from "../components/ui";
 import { IMAGE_PROVIDER_LABELS, pickable, START_IMAGE_LABELS } from "../models";
 import { parseVoices, SECRET_KEYS, settingsBody, voiceLabel, withCurrent, type Settings } from "../settings";
 import "./Providers.css";
+import { t } from "../i18n";
 
 type Health = Record<string, boolean>;
 interface HealthState {
@@ -33,65 +34,80 @@ const PROVIDERS: ProviderCard[] = [
   {
     id: "claude",
     name: "Claude",
-    role: "Idées, scripts et métadonnées",
-    fields: [{ key: "anthropic_api_key", label: "Clé API Anthropic" }],
+    role: t("Idées, scripts et métadonnées"),
+    fields: [{ key: "anthropic_api_key", label: t("Clé API Anthropic") }],
   },
   {
     id: "gemini",
     name: "Gemini",
-    role: "Alternative à Claude pour les idées, scripts et métadonnées ; images de référence",
+    role: t("Alternative à Claude pour les idées, scripts et métadonnées ; images de référence"),
     fields: [
-      { key: "gemini_api_key", label: "Clé API Google AI Studio" },
-      { key: "gemini_model", label: "Modèle", choices: (models) => models?.llm.gemini ?? [] },
+      { key: "gemini_api_key", label: t("Clé API Google AI Studio") },
+      { key: "gemini_model", label: t("Modèle"), choices: (models) => models?.llm.gemini ?? [] },
       {
         key: "gemini_image_model",
-        label: "Modèle d'image",
+        label: t("Modèle d'image"),
         choices: (models) => models?.image.filter((m) => m.provider === "gemini").map((m) => m.id) ?? [],
       },
     ],
   },
   {
+    id: "groq",
+    name: "Groq",
+    role: t("Alternative hébergée pour les idées, scripts et métadonnées, rapide et peu coûteuse"),
+    fields: [
+      { key: "groq_api_key", label: t("Clé API GroqCloud (gsk_…)") },
+      { key: "groq_model", label: t("Modèle"), choices: (models) => models?.llm.groq ?? [] },
+    ],
+  },
+  {
     id: "ollama",
     name: "Ollama",
-    role: "Idées, scripts et métadonnées sur votre machine, sans clé ni coût",
+    role: t("Idées, scripts et métadonnées sur votre machine, sans clé ni coût"),
     fields: [
-      { key: "ollama_url", label: "URL du serveur" },
-      { key: "ollama_model", label: "Modèle (téléchargé avec « ollama pull »)" },
+      { key: "ollama_url", label: t("URL du serveur") },
+      { key: "ollama_model", label: t("Modèle (téléchargé avec « ollama pull »)") },
     ],
   },
   {
     id: "fal",
     name: "fal.ai",
-    role: "Clips vidéo et images de référence",
-    fields: [{ key: "fal_key", label: "Clé API fal.ai" }],
+    role: t("Clips vidéo et images de référence"),
+    fields: [{ key: "fal_key", label: t("Clé API fal.ai") }],
   },
   {
     id: "comfyui",
     name: "ComfyUI",
-    role: "Clips vidéo sur votre serveur",
-    fields: [{ key: "comfyui_url", label: "URL du serveur" }],
+    role: t("Clips vidéo sur votre serveur"),
+    fields: [{ key: "comfyui_url", label: t("URL du serveur") }],
+  },
+  {
+    id: "comfycloud",
+    name: "Comfy Cloud",
+    role: t("Clips vidéo et images de référence sur les GPU de Comfy Cloud, mêmes profils que ComfyUI (abonnement payant)"),
+    fields: [{ key: "comfy_cloud_api_key", label: t("Clé API Comfy Cloud") }],
   },
   {
     id: "elevenlabs",
     name: "ElevenLabs",
-    role: "Voix off",
+    role: t("Voix off"),
     fields: [
-      { key: "elevenlabs_api_key", label: "Clé API ElevenLabs" },
+      { key: "elevenlabs_api_key", label: t("Clé API ElevenLabs") },
     ],
   },
   {
     id: "langfuse",
     name: "Langfuse",
-    role: "Journal des appels IA (prompts, réponses, coûts)",
+    role: t("Journal des appels IA (prompts, réponses, coûts)"),
     fields: [
-      { key: "langfuse_public_key", label: "Clé publique (pk-lf-…)" },
-      { key: "langfuse_secret_key", label: "Clé secrète (sk-lf-…)" },
-      { key: "langfuse_base_url", label: "Serveur (vide = cloud.langfuse.com)" },
+      { key: "langfuse_public_key", label: t("Clé publique (pk-lf-…)") },
+      { key: "langfuse_secret_key", label: t("Clé secrète (sk-lf-…)") },
+      { key: "langfuse_base_url", label: t("Serveur (vide = cloud.langfuse.com)") },
     ],
   },
 ];
 
-const LLM_PROVIDER_LABELS: Record<string, string> = { claude: "Claude", gemini: "Gemini", ollama: "Ollama (local)" };
+const LLM_PROVIDER_LABELS: Record<string, string> = { claude: "Claude", gemini: "Gemini", groq: "Groq", ollama: t("Ollama (local)") };
 
 /** Secrets affichés vides : on n'y saisit qu'une nouvelle valeur. */
 const draftOf = (saved: Settings): Settings =>
@@ -121,25 +137,25 @@ export default function Providers() {
   return (
     <div className="providers-page">
       <header className="page-head">
-        <h1>Réglages</h1>
+        <h1>{t("Réglages")}</h1>
         <div className="page-head-actions">
           <button className="btn" onClick={retest} disabled={health.testing}>
-            {health.testing ? "Test en cours…" : "Retester"}
+            {health.testing ? t("Test en cours…") : t("Retester")}
           </button>
         </div>
       </header>
-      {health.error && <p className="error page-error">Test des connexions impossible. {health.error}</p>}
+      {health.error && <p className="error page-error">{t("Test des connexions impossible.")} {health.error}</p>}
       {models.error && (
         <div className="error page-error" role="alert">
-          Liste des modèles indisponible. {models.error}{" "}
+          {t("Liste des modèles indisponible.")} {models.error}{" "}
           <button className="btn btn-small" onClick={models.reload}>
-            Réessayer
+            {t("Réessayer")}
           </button>
         </div>
       )}
 
       {settings.error && <ErrorState message={settings.error} onRetry={settings.reload} />}
-      {!settings.error && !settings.data && <p className="muted">Chargement…</p>}
+      {!settings.error && !settings.data && <p className="muted">{t("Chargement…")}</p>}
       {settings.data && (
         <SettingsForm initial={settings.data} models={models.data} modelsError={models.error} health={health} onSaved={retest} />
       )}
@@ -197,12 +213,12 @@ function SettingsForm({
           type={secret ? "password" : "text"}
           autoComplete="off"
           spellCheck={false}
-          placeholder={secret ? saved[key] || "Non configurée" : undefined}
+          placeholder={secret ? saved[key] || t("Non configurée") : undefined}
           value={draft[key] ?? ""}
           onChange={(e) => set({ [key]: e.target.value })}
         />
         {hint && <small className="muted">{hint}</small>}
-        {secret && saved[key] && <small className="muted">Laissez vide pour garder la clé enregistrée.</small>}
+        {secret && saved[key] && <small className="muted">{t("Laissez vide pour garder la clé enregistrée.")}</small>}
       </Field>
     );
   };
@@ -230,9 +246,9 @@ function SettingsForm({
     <>
       {select(
         "default_voice_id",
-        "Voix par défaut",
+        t("Voix par défaut"),
         ["", ...withCurrent(voices.map((v) => v.id), draft.default_voice_id ?? "")],
-        { "": "Aucune", ...Object.fromEntries(voices.map((v) => [v.id, voiceLabel(voices, v.id)])) },
+        { "": t("Aucune"), ...Object.fromEntries(voices.map((v) => [v.id, voiceLabel(voices, v.id)])) },
       )}
       <VoiceCatalog value={draft.voice_catalog ?? "[]"} onChange={(json) => set({ voice_catalog: json })} />
     </>
@@ -258,25 +274,24 @@ function SettingsForm({
         <section className="provider-card provider-defaults" aria-labelledby="pv-defaults">
           <header className="provider-head">
             <div>
-              <h2 id="pv-defaults">Choix par défaut</h2>
-              <p className="muted">Rédaction appliquée aux prochaines étapes, vidéo proposée à l'étape Clips, dépense maximale par vidéo</p>
+              <h2 id="pv-defaults">{t("Choix par défaut")}</h2>
+              <p className="muted">{t("Rédaction appliquée aux prochaines étapes, vidéo proposée à l'étape Clips, dépense maximale par vidéo")}</p>
             </div>
           </header>
           <div className="form-row">
             {select(
               "llm_provider",
-              "Rédaction (idées, scripts, métadonnées)",
+              t("Rédaction (idées, scripts, métadonnées)"),
               Object.keys(LLM_PROVIDER_LABELS),
               LLM_PROVIDER_LABELS,
             )}
-            {select("image_provider", "Image de référence", Object.keys(IMAGE_PROVIDER_LABELS), IMAGE_PROVIDER_LABELS)}
+            {select("image_provider", t("Image de référence"), Object.keys(IMAGE_PROVIDER_LABELS), IMAGE_PROVIDER_LABELS)}
           </div>
           <div className="form-row">
-            {select("start_image_provider", "Image de départ des scènes (avancé)", Object.keys(START_IMAGE_LABELS), START_IMAGE_LABELS)}
+            {select("start_image_provider", t("Image de départ des scènes (avancé)"), Object.keys(START_IMAGE_LABELS), START_IMAGE_LABELS)}
           </div>
           <p className="muted">
-            Quand une scène a des images de référence, ce générateur les replace dans la scène avant l'animation (ComfyUI seulement).
-            Modifiable à chaque lancement des clips, dans Avancé.
+            {t("Quand une scène a des images de référence, ce générateur les replace dans la scène avant l'animation (ComfyUI et Comfy Cloud seulement). Modifiable à chaque lancement des clips, dans Avancé.")}
           </p>
           <ModelCards
             cards={models?.video}
@@ -287,13 +302,13 @@ function SettingsForm({
               model: draft.default_video_model ?? "",
             })}
             onChange={({ provider, model }) => set({ default_video_provider: provider, default_video_model: model })}
-            label="Profil vidéo proposé à l'étape Clips"
+            label={t("Profil vidéo proposé à l'étape Clips")}
           />
           <div className="form-row">
             {input({
               key: "project_budget_usd",
-              label: "Budget maximum par vidéo ($)",
-              hint: "Au-delà, les nouvelles générations payantes sont refusées et le mode automatique s'arrête. 0 = sans limite.",
+              label: t("Budget maximum par vidéo ($)"),
+              hint: t("Au-delà, les nouvelles générations payantes sont refusées et le mode automatique s'arrête. 0 = sans limite."),
             })}
           </div>
         </section>
@@ -307,12 +322,12 @@ function SettingsForm({
         )}
         {status.done && (
           <p className="muted" role="status">
-            Réglages enregistrés.
+            {t("Réglages enregistrés.")}
           </p>
         )}
-        {dirty && !status.error && <p className="muted">Modifications non enregistrées</p>}
+        {dirty && !status.error && <p className="muted">{t("Modifications non enregistrées")}</p>}
         <button className="btn btn-primary" disabled={!dirty || busy}>
-          {busy ? "Enregistrement…" : "Enregistrer"}
+          {busy ? t("Enregistrement…") : t("Enregistrer")}
         </button>
       </footer>
     </form>
@@ -327,7 +342,7 @@ function healthStatus(health: HealthState, id: string): string {
 /** Pastille de connexion : couleur + libellé (jamais la couleur seule). */
 function HealthBadge({ health, id }: { health: HealthState; id: string }) {
   const status = healthStatus(health, id);
-  const label = { pending: health.testing ? "Test…" : "Inconnu", approved: "Connecté", failed: "Non connecté" }[status];
+  const label = { pending: health.testing ? t("Test…") : t("Inconnu"), approved: t("Connecté"), failed: t("Non connecté") }[status];
   return (
     <span className="status-badge health-badge" role="status">
       <span className="health-dot" aria-hidden />

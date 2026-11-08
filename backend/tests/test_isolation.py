@@ -110,18 +110,15 @@ async def test_assist_with_foreign_project_id_is_404(api_as, users):
     assert (r.status_code, r.json()) == (404, {"detail": "Projet introuvable"})
 
 
-async def test_costs_filtered_by_owner(api_as, users, admin, session):
+async def test_costs_are_admin_only(api_as, users, admin, session):
     a, b = users
     client_a = await api_as(a)
     pid_a, pid_b = await create_project(client_a), await create_project(await api_as(b))
     session.add_all(ProviderCall(project_id=pid, step="clips", provider="fal", model="m", cost_usd=cost, status="ok")
                     for pid, cost in ((pid_a, 1.0), (pid_b, 2.0), (None, 4.0)))
     await session.commit()
-    mine = (await client_a.get("/api/costs")).json()
-    assert (mine["total_usd"], mine["calls_total"], mine["by_project"]) == (1.0, 1, {str(pid_a): 1.0})
-    assert [c["project_id"] for c in mine["calls"]] == [pid_a]
-    assert (await client_a.get("/api/costs", params={"project_id": pid_b})).status_code == 404
-    assert (await client_a.get("/api/costs", params={"project_id": pid_a})).json()["total_usd"] == 1.0
+    assert (await client_a.get("/api/costs")).status_code == 403  # dollars : jamais devant un client
+    assert (await client_a.get("/api/costs", params={"project_id": pid_a})).status_code == 403
     everything = (await (await api_as(admin)).get("/api/costs")).json()
     assert (everything["total_usd"], everything["calls_total"]) == (7.0, 3)
 

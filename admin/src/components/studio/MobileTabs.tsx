@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { PreviewIcon, ScenesIcon, SettingsIcon } from "../icons";
+import { t } from "../../i18n";
 
 export type Pane = "preview" | "scenes" | "step";
 
@@ -14,12 +15,12 @@ export default function MobileTabs({
   sceneCount: number;
 }) {
   const tabs: { id: Pane; label: string; icon: ReactNode }[] = [
-    { id: "preview", label: "Aperçu", icon: <PreviewIcon /> },
-    ...(sceneCount > 0 ? [{ id: "scenes" as const, label: `Scènes (${sceneCount})`, icon: <ScenesIcon /> }] : []),
-    { id: "step", label: "Étape", icon: <SettingsIcon /> },
+    { id: "preview", label: t("Aperçu"), icon: <PreviewIcon /> },
+    ...(sceneCount > 0 ? [{ id: "scenes" as const, label: t("Scènes ({n})", { n: sceneCount }), icon: <ScenesIcon /> }] : []),
+    { id: "step", label: t("Étape"), icon: <SettingsIcon /> },
   ];
   return (
-    <nav className="studio-tabs" aria-label="Volets de l'éditeur">
+    <nav className="studio-tabs" aria-label={t("Volets de l'éditeur")}>
       {tabs.map((t) => (
         <button key={t.id} aria-current={t.id === pane ? "page" : undefined} onClick={() => onChange(t.id)}>
           {t.icon}

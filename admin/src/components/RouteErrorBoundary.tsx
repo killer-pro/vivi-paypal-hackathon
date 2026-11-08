@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { ErrorState } from "./ui";
+import { t } from "../i18n";
 
 /** Une exception de rendu n'efface plus tout l'écran : message et « Réessayer » à la place de la page. */
 class Boundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -14,7 +15,7 @@ class Boundary extends Component<{ children: ReactNode }, { error: Error | null 
     if (!this.state.error) return this.props.children;
     return (
       <main className="center-screen">
-        <ErrorState message={`Cet écran a rencontré une erreur : ${this.state.error.message}`} onRetry={() => this.setState({ error: null })} />
+        <ErrorState message={t("Cet écran a rencontré une erreur : {error}", { error: this.state.error.message })} onRetry={() => this.setState({ error: null })} />
       </main>
     );
   }

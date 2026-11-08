@@ -68,7 +68,7 @@ Tests : `npm test` (vitest). Build : `npm run build`. Lint : `npm run lint`.
 - **Musique** (`/music`), **Réglages** (`/providers`, page « Réglages »), **Coûts** (`/costs`) : voir ci-dessous.
 
 Barre latérale fine (`components/Layout.tsx`, 72 px) : repère 9:16 à l'accent, puis icône SVG inline (`components/icons.tsx`)
-+ libellé court : Projets, Musique, Réglages (`/providers`), Coûts (Musique et Réglages : administrateur seulement) ; masquée dans l'éditeur et l'écran Plan (plein cadre) ;
++ libellé court : Projets, Musique, Réglages (`/providers`), Coûts (Musique, Réglages et Coûts : administrateur seulement) ; masquée dans l'éditeur et l'écran Plan (plein cadre) ;
 « Sortir » (déconnexion) en bas. Sous 720 px, elle devient une barre horizontale en haut.
 La garde d'auth (`components/Layout.tsx`) appelle `GET /api/auth/me` ; toute réponse `401` renvoie vers `/login` (sauf
 sur les écrans de compte) ; bandeau « Confirmez votre adresse e-mail » tant que l'adresse n'est pas vérifiée.

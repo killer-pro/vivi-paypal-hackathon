@@ -8,20 +8,20 @@ from app.crypto import decrypt, encrypt
 from app.models import Setting
 from app.providers.gemini import DEFAULT_IMAGE_MODEL as GEMINI_DEFAULT_IMAGE_MODEL
 from app.providers.gemini import DEFAULT_MODEL as GEMINI_DEFAULT_MODEL
+from app.providers.groq import DEFAULT_MODEL as GROQ_DEFAULT_MODEL
 from app.providers.ollama import DEFAULT_MODEL as OLLAMA_DEFAULT_MODEL
 from app.providers.ollama import DEFAULT_URL as OLLAMA_DEFAULT_URL
 from app.providers.profiles import DEFAULT_PROFILE, LEGACY_NAMES
-from app.services.access import DEFAULT_LOCKED, parse_locked
 from app.services.billing import DEFAULT_BILLING, parse_billing
 from app.services.pricing import DEFAULT_PRICING, parse_pricing, positive_decimal
 
 MASK = "••••"
 CREDIT_KEYS = ("credits_usd_per_credit", "credits_margin", "credits_signup_grant", "credits_reservation_timeout_min",
-               "credits_max_parallel_clips", "credits_pricing", "subscription_locked", "billing_config")
-SECRET_KEYS = {"anthropic_api_key", "gemini_api_key", "fal_key", "elevenlabs_api_key", "langfuse_secret_key", "smtp_password",
+               "credits_pricing", "billing_config")
+SECRET_KEYS = {"anthropic_api_key", "gemini_api_key", "groq_api_key", "fal_key", "comfy_cloud_api_key", "elevenlabs_api_key", "langfuse_secret_key", "smtp_password",
                 "stripe_secret_key", "stripe_webhook_secret", "paypal_client_secret"}
 EDITABLE_KEYS = SECRET_KEYS | {"comfyui_url", "default_voice_id", "voice_catalog", "default_video_provider", "default_video_model",
-                               "llm_provider", "gemini_model", "ollama_url", "ollama_model", "project_budget_usd", "image_provider",
+                               "llm_provider", "gemini_model", "groq_model", "ollama_url", "ollama_model", "project_budget_usd", "image_provider",
                                "start_image_provider", "gemini_image_model", "langfuse_public_key", "langfuse_base_url",
                                "smtp_host", "smtp_port", "smtp_user", "smtp_sender", "paypal_client_id", "paypal_webhook_id", "paypal_mode",
                                *CREDIT_KEYS}
@@ -29,19 +29,20 @@ EDITABLE_KEYS = SECRET_KEYS | {"comfyui_url", "default_voice_id", "voice_catalog
 EDITOR_KEYS = {"default_voice_id", "voice_catalog", "default_video_provider", "default_video_model", "image_provider",
                "start_image_provider"}
 DEFAULTS = {"default_voice_id": "", "voice_catalog": "[]", "default_video_provider": "comfyui", "default_video_model": DEFAULT_PROFILE,
-            "llm_provider": "claude", "gemini_model": GEMINI_DEFAULT_MODEL,
+            "llm_provider": "claude", "gemini_model": GEMINI_DEFAULT_MODEL, "groq_model": GROQ_DEFAULT_MODEL,
             "ollama_url": OLLAMA_DEFAULT_URL, "ollama_model": OLLAMA_DEFAULT_MODEL, "project_budget_usd": "10",
             "image_provider": "gemini", "start_image_provider": "comfyui", "gemini_image_model": GEMINI_DEFAULT_IMAGE_MODEL,
-            "smtp_port": "587", "credits_usd_per_credit": "0.05", "credits_margin": "2.5", "credits_signup_grant": "100",
-            "credits_reservation_timeout_min": "30", "credits_max_parallel_clips": "1", "credits_pricing": DEFAULT_PRICING,
-            "subscription_locked": DEFAULT_LOCKED, "billing_config": DEFAULT_BILLING, "paypal_mode": "sandbox"}
-LLM_PROVIDERS = ("claude", "gemini", "ollama")
+            "smtp_port": "587", "credits_usd_per_credit": "0.01", "credits_margin": "3", "credits_signup_grant": "200",
+            "credits_reservation_timeout_min": "30", "credits_pricing": DEFAULT_PRICING,
+            "billing_config": DEFAULT_BILLING, "paypal_mode": "sandbox"}
+LLM_PROVIDERS = ("claude", "gemini", "groq", "ollama")
 START_IMAGE_PROVIDERS = ("comfyui", "gemini")  # image de départ de chaque scène : Flux Kontext (local) ou Gemini
-IMAGE_PROVIDERS = ("gemini", "fal", "comfyui")  # image de référence ; Gemini par défaut (même clé que la rédaction)
+IMAGE_PROVIDERS = ("gemini", "fal", "comfyui", "comfycloud")  # image de référence ; Gemini par défaut (même clé que la rédaction)
 # Réglages à valeurs fermées : une autre valeur est refusée à l'écriture.
 CHOICES = {"paypal_mode": ("sandbox", "live"), "llm_provider": LLM_PROVIDERS, "image_provider": IMAGE_PROVIDERS, "start_image_provider": START_IMAGE_PROVIDERS}
 # Réglages au format contraint (vide = retour au défaut) : un identifiant de modèle finit dans une URL.
-PATTERNS = {key: re.compile(r"[A-Za-z0-9._-]+") for key in ("gemini_model", "gemini_image_model", "ollama_model")}
+PATTERNS = {**{key: re.compile(r"[A-Za-z0-9._-]+") for key in ("gemini_model", "gemini_image_model", "ollama_model")},
+            "groq_model": re.compile(r"[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)?")}  # Groq préfixe l'éditeur : « openai/gpt-oss-120b »
 # Anciennes valeurs remplacées : lues et écrites sous leur nouveau nom (`workflow` d'avant les profils → `max`).
 RENAMED = {"default_video_model": LEGACY_NAMES}
 # Identifiant de voix : inséré dans l'URL du provider, donc limité à des caractères sûrs (ni « / » ni « . »).
@@ -80,6 +81,48 @@ def _budget(value: str) -> float | None:
     return amount if 0 <= amount < float("inf") else None
 
 
+def _integer_from(minimum: int):
+    """Règle « entier ≥ minimum »."""
+    return lambda value: value.isascii() and value.isdigit() and int(value) >= minimum
+
+
+# Règles de valeur par réglage : (valeur acceptée ?, message de refus). Une valeur vide (retour au défaut) n'est jamais contrôlée.
+RULES = {
+    "project_budget_usd": (lambda v: _budget(v) is not None, "project_budget_usd : montant invalide (nombre de dollars, 0 = sans limite)"),
+    **{key: (lambda v: positive_decimal(v) is not None, f"{key} : nombre strictement positif attendu")
+       for key in ("credits_usd_per_credit", "credits_margin")},
+    **{key: (_integer_from(minimum), f"{key} : entier supérieur ou égal à {minimum} attendu")
+       for key, minimum in (("credits_signup_grant", 0), ("credits_reservation_timeout_min", 1))},
+    "credits_pricing": (lambda v: parse_pricing(v) is not None,
+                        "credits_pricing : table de tarifs invalide (JSON {margin_overrides, flat_usd, local_clip_usd}, "
+                        "montants finis ≥ 0, actions et profils connus)"),
+    "billing_config": (lambda v: parse_billing(v) is not None,
+                       "billing_config : offre invalide (JSON {tiers, free, packs} : au moins un forfait, crédits et limites "
+                       "entiers > 0, avantages complets, profils connus, identifiants uniques, forfait en minuscules de 20 caractères au plus)"),
+    "smtp_port": (lambda v: _port(v) is not None, "smtp_port : port invalide (entier entre 1 et 65535)"),
+    "default_voice_id": (lambda v: VOICE_ID.fullmatch(v) is not None,
+                         "default_voice_id : identifiant invalide (lettres, chiffres, _ et - uniquement, 64 max)"),
+    "voice_catalog": (lambda v: parse_voice_catalog(v) is not None,
+                      f"voice_catalog : liste de voix invalide (nom 80 caractères max, identifiant unique, {MAX_VOICES} voix au plus)"),
+}
+
+
+def _validation_error(key: str, value: str) -> str | None:
+    """Raison du refus de `value` pour `key` (valeurs fermées, format contraint, règle propre au réglage) ; `None` si elle est valide."""
+    allowed = CHOICES.get(key)
+    if allowed and value not in allowed:
+        return f"{key} : valeur « {value} » invalide (attendu : {', '.join(allowed)})"
+    if not value:
+        return None
+    pattern = PATTERNS.get(key)
+    if pattern and not pattern.fullmatch(value):
+        return f"{key} : valeur « {value} » invalide (lettres, chiffres, . _ - uniquement{', un / au plus' if key == 'groq_model' else ''})"
+    rule = RULES.get(key)
+    if rule and not rule[0](value):
+        return rule[1]
+    return None
+
+
 class AppSettings:
     def __init__(self, session: AsyncSession):
         self._s = session
@@ -108,36 +151,10 @@ class AppSettings:
         for key in values:
             if key not in EDITABLE_KEYS:
                 raise KeyError(key)
-        for key, allowed in CHOICES.items():
-            if key in values and values[key] not in allowed:
-                raise ValueError(f"{key} : valeur « {values[key]} » invalide (attendu : {', '.join(allowed)})")
-        if "project_budget_usd" in values and values["project_budget_usd"] and _budget(values["project_budget_usd"]) is None:
-            raise ValueError("project_budget_usd : montant invalide (nombre de dollars, 0 = sans limite)")
-        for key in ("credits_usd_per_credit", "credits_margin"):
-            if values.get(key) and positive_decimal(values[key]) is None:
-                raise ValueError(f"{key} : nombre strictement positif attendu")
-        for key, minimum in (("credits_signup_grant", 0), ("credits_reservation_timeout_min", 1), ("credits_max_parallel_clips", 1)):
-            if values.get(key) and not (values[key].isascii() and values[key].isdigit() and int(values[key]) >= minimum):
-                raise ValueError(f"{key} : entier supérieur ou égal à {minimum} attendu")
-        if "credits_pricing" in values and values["credits_pricing"] and parse_pricing(values["credits_pricing"]) is None:
-            raise ValueError("credits_pricing : table de tarifs invalide (JSON {margin_overrides, flat_usd, local_clip_usd}, "
-                             "montants finis ≥ 0, actions et profils connus)")
-        if values.get("subscription_locked") and parse_locked(values["subscription_locked"]) is None:
-            raise ValueError("subscription_locked : liste invalide (JSON {profiles, reference, styles} : profils et styles "
-                             "connus, reference vrai ou faux)")
-        if values.get("billing_config") and parse_billing(values["billing_config"]) is None:
-            raise ValueError("billing_config : offre invalide (JSON {subscription, packs} : crédits entiers > 0, "
-                             "identifiants de pack uniques)")
-        if values.get("smtp_port") and _port(values["smtp_port"]) is None:
-            raise ValueError("smtp_port : port invalide (entier entre 1 et 65535)")
-        if values.get("default_voice_id") and not VOICE_ID.fullmatch(values["default_voice_id"]):
-            raise ValueError("default_voice_id : identifiant invalide (lettres, chiffres, _ et - uniquement, 64 max)")
-        if "voice_catalog" in values and parse_voice_catalog(values["voice_catalog"] or "[]") is None:
-            raise ValueError(f"voice_catalog : liste de voix invalide (nom 80 caractères max, identifiant unique, "
-                             f"{MAX_VOICES} voix au plus)")
-        for key, pattern in PATTERNS.items():
-            if values.get(key) and not pattern.fullmatch(values[key]):
-                raise ValueError(f"{key} : valeur « {values[key]} » invalide (lettres, chiffres, . _ - uniquement)")
+        for key, value in values.items():
+            error = _validation_error(key, value)
+            if error:
+                raise ValueError(error)
         for key, value in values.items():
             value = RENAMED.get(key, {}).get(value, value)
             await self._s.merge(Setting(key=key, value=encrypt(value) if key in SECRET_KEYS else value))

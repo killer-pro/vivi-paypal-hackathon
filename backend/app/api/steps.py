@@ -12,7 +12,7 @@ from app.models import Asset, Scene
 from app.queue import get_enqueue, publish_event
 from app.services import credits
 from app.services.flow import ensure_not_running, load_steps, mark_stale, plan_until, script_stale_names, sync_status
-from app.services.pipeline import ref_id
+from app.services.llm_json import ref_id
 from app.services.queue_runs import dispatch_queue, remove_queued, run_or_queue
 from app.services.steps import (
     cancel_step,

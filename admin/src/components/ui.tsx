@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { t } from "../i18n";
 
 /** Libellé + contrôle de formulaire. */
 export function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -11,7 +12,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
 }
 
 /** Volet replié par défaut (« Avancé » : réglages techniques, providers, modèles, identifiants). */
-export function Advanced({ label = "Avancé", children }: { label?: string; children: ReactNode }) {
+export function Advanced({ label = t("Avancé"), children }: { label?: string; children: ReactNode }) {
   return (
     <details className="advanced">
       <summary>{label}</summary>
@@ -52,7 +53,7 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry: () 
     <div className="error-state" role="alert">
       <p className="error">{message}</p>
       <button className="btn" onClick={onRetry}>
-        Réessayer
+        {t("Réessayer")}
       </button>
     </div>
   );
@@ -77,7 +78,7 @@ export function FormActions({
     <div className="form-actions">
       {hint && <span className="muted form-actions-hint">{hint}</span>}
       <button type="button" className="btn btn-ghost" onClick={onCancel}>
-        Annuler
+        {t("Annuler")}
       </button>
       <button className={primary ? "btn btn-primary" : "btn"} disabled={disabled}>
         {submitLabel}

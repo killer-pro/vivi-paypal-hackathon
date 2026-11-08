@@ -96,3 +96,9 @@
   color: var(--text);
   text-decoration: underline;
 }
+
+.login-lang {
+  display: flex;
+  justify-content: center;
+  margin-top: -8px;
+}

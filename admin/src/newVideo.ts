@@ -1,5 +1,6 @@
 import type { StyleOption } from "./api";
 import type { Template } from "./templates";
+import { t } from "./i18n";
 
 export const MIN_DURATION_S = 5;
 export const MAX_DURATION_S = 180;
@@ -11,7 +12,7 @@ const MAX_TITLE = 60;
 /** Titre du projet tiré du sujet saisi : première ligne, coupée au mot sous 60 caractères. */
 export function titleFromSubject(subject: string): string {
   const line = subject.trim().split("\n")[0].replace(/\s+/g, " ");
-  if (!line) return "Nouvelle vidéo";
+  if (!line) return t("Nouvelle vidéo");
   if (line.length <= MAX_TITLE) return line;
   const head = line.slice(0, MAX_TITLE);
   const space = head.lastIndexOf(" ");
@@ -42,10 +43,14 @@ export const styleOptions = (
   locked: string[] = [],
   hint = "",
 ): { value: string; label: string; disabled?: boolean; hint?: string }[] => [
-  { value: "", label: "Aucun" },
+  { value: "", label: t("Aucun") },
   ...styles.map((s) => ({
     value: s.id,
-    label: s.label,
+    label: t(s.label),
     ...(locked.includes(s.id) ? { disabled: true, hint } : {}),
   })),
 ];
+
+/** Durées proposées en un clic ; celles au-delà du forfait (`max`) restent visibles, désactivées, avec le motif. */
+export const durationOptions = (max: number | undefined, hint = ""): { value: string; label: string; disabled?: boolean; hint?: string }[] =>
+  DURATIONS.map((d) => ({ value: String(d), label: `${d} s`, ...(max !== undefined && d > max ? { disabled: true, hint } : {}) }));

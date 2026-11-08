@@ -17,22 +17,23 @@ import { formatCredits } from "../credits";
 import type { Settings } from "../settings";
 import { usd } from "../format";
 import "./Pricing.css";
+import { t } from "../i18n";
 
 const PERIODS = [
   { days: 7, label: "7 derniers jours" },
   { days: 30, label: "30 derniers jours" },
-  { days: 0, label: "Depuis le début" },
+  { days: 0, label: t("Depuis le début") },
 ];
 
 /** Tarifs du crédit (valeur, marge, exceptions, coûts de revient) et tableau coût de revient vs crédits facturés. */
 export default function Pricing() {
   const settings = useApi<Settings>("/settings");
   if (settings.error) return <ErrorState message={settings.error} onRetry={settings.reload} />;
-  if (!settings.data) return <p className="muted">Chargement…</p>;
+  if (!settings.data) return <p className="muted">{t("Chargement…")}</p>;
   return (
     <>
       <header className="page-head">
-        <h1>Tarifs</h1>
+        <h1>{t("Tarifs")}</h1>
       </header>
       <MarginsTable />
       <PricingForm initial={settings.data} />
@@ -48,10 +49,10 @@ function MarginsTable() {
   return (
     <section aria-labelledby="margins-title" className="pricing-block">
       <div className="pricing-head">
-        <h2 id="margins-title">Marges observées</h2>
+        <h2 id="margins-title">{t("Marges observées")}</h2>
         <select
           className="input"
-          aria-label="Période"
+          aria-label={t("Période")}
           value={days}
           onChange={(e) => {
             setDays(Number(e.target.value));
@@ -69,21 +70,20 @@ function MarginsTable() {
       {data && (
         <>
           <p className="muted">
-            Revenu estimé au prix nominal du crédit ({usd.format(data.usd_per_credit)}) ; marge visée ×{data.margin}. Les
-            projets de l'administrateur ne comptent pas.
+            {t("Revenu estimé au prix nominal du crédit ({price}) ; marge visée ×{margin}. Les projets de l'administrateur ne comptent pas.", { price: usd.format(data.usd_per_credit), margin: data.margin })}
           </p>
           {data.rows.length === 0 ? (
-            <p className="muted">Aucune génération facturée sur la période.</p>
+            <p className="muted">{t("Aucune génération facturée sur la période.")}</p>
           ) : (
             <div className="table-wrap">
               <table className="table">
                 <thead>
                   <tr>
-                    <th>Action</th>
-                    <th className="num">Coût de revient</th>
-                    <th className="num">Crédits facturés</th>
-                    <th className="num">Revenu estimé</th>
-                    <th className="num">Marge observée</th>
+                    <th>{t("Action")}</th>
+                    <th className="num">{t("Coût de revient")}</th>
+                    <th className="num">{t("Crédits facturés")}</th>
+                    <th className="num">{t("Revenu estimé")}</th>
+                    <th className="num">{t("Marge observée")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -152,31 +152,31 @@ function PricingForm({ initial }: { initial: Settings }) {
 
   return (
     <form className="pricing-block" onSubmit={submit}>
-      <h2>Réglages des tarifs</h2>
+      <h2>{t("Réglages des tarifs")}</h2>
       {group(
-        "Crédit et marge",
-        "Prix en crédits = coût de revient × marge ÷ valeur du crédit, arrondi au crédit supérieur.",
+        t("Crédit et marge"),
+        t("Prix en crédits = coût de revient × marge ÷ valeur du crédit, arrondi au crédit supérieur."),
         <>
-          {num("Valeur d'un crédit ($)", draft.usdPerCredit, (v) => edit({ usdPerCredit: v }))}
+          {num(t("Valeur d'un crédit ($)"), draft.usdPerCredit, (v) => edit({ usdPerCredit: v }))}
           {num("Marge globale (×)", draft.margin, (v) => edit({ margin: v }))}
-          {num("Crédits offerts à l'inscription", draft.signupGrant, (v) => edit({ signupGrant: v }))}
+          {num(t("Crédits offerts à l'inscription"), draft.signupGrant, (v) => edit({ signupGrant: v }))}
         </>,
       )}
       {group(
-        "Exceptions de marge",
-        "Vide : la marge globale s'applique.",
+        t("Exceptions de marge"),
+        t("Vide : la marge globale s'applique."),
         MARGIN_ACTIONS.map((a) =>
           num(actionLabel(a), draft.marginOverrides[a] ?? "", (v) => editTable("marginOverrides", a, v), "globale"),
         ),
       )}
       {group(
-        "Coût de revient forfaitaire ($)",
-        "Coût d'une action (la voix : par scène). Les clips viennent du coût réel du provider ou du forfait local.",
+        t("Coût de revient forfaitaire ($)"),
+        t("Coût d'une action (la voix : par scène). Les clips viennent du coût réel du provider ou du forfait local."),
         FLAT_ACTIONS.map((a) => num(actionLabel(a), draft.flatUsd[a] ?? "", (v) => editTable("flatUsd", a, v))),
       )}
       {group(
-        "Clip local, par profil ($ pour 3 s)",
-        "Coût interne d'un clip ComfyUI : serveur, électricité, amortissement.",
+        t("Clip local, par profil ($ pour 3 s)"),
+        t("Coût interne d'un clip ComfyUI : serveur, électricité, amortissement."),
         CLIP_PROFILES.map((p) => num(PROFILE_LABELS[p], draft.localClipUsd[p] ?? "", (v) => editTable("localClipUsd", p, v))),
       )}
       {status.error && (
@@ -184,9 +184,9 @@ function PricingForm({ initial }: { initial: Settings }) {
           {status.error}
         </p>
       )}
-      {status.done && <p className="muted">Tarifs enregistrés : ils s'appliquent aux prochains lancements.</p>}
+      {status.done && <p className="muted">{t("Tarifs enregistrés : ils s'appliquent aux prochains lancements.")}</p>}
       <button className="btn btn-primary" disabled={!dirty || busy}>
-        Enregistrer les tarifs
+        {t("Enregistrer les tarifs")}
       </button>
     </form>
   );

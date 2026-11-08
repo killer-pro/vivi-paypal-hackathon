@@ -5,6 +5,7 @@ import { DownloadIcon, PlusIcon, ProjectsIcon, SearchIcon, TrashIcon } from "../
 import Pills from "../components/Pills";
 import { ConfirmDialog, ErrorState } from "../components/ui";
 import { useEvents } from "../events";
+import { formatCredits } from "../credits";
 import { plainTitle, usd } from "../format";
 import {
   cardState,
@@ -22,6 +23,7 @@ import {
 import { useDebounced } from "../hooks/useDebounced";
 import { STEP_LABELS, STEP_ORDER } from "../steps";
 import "./Projects.css";
+import { t } from "../i18n";
 
 export default function Projects() {
   const [search, setSearch] = useState("");
@@ -48,7 +50,7 @@ export default function Projects() {
       await api(`/projects/${project.id}`, { method: "DELETE" });
       setDeleteError(null);
     } catch (err) {
-      setDeleteError(`Suppression de « ${project.title} » impossible. ${errorMessage(err)}`);
+      setDeleteError(t("Suppression de « {title} » impossible. {error}", { title: project.title, error: errorMessage(err) }));
     }
     reload();
   }
@@ -57,27 +59,27 @@ export default function Projects() {
     <div className="home">
       <section className="library" aria-labelledby="library-title">
         <header className="library-head">
-          <h1 id="library-title">Vos vidéos</h1>
+          <h1 id="library-title">{t("Vos vidéos")}</h1>
           {page && <span className="count">{page.total}</span>}
           <Link className="btn btn-primary library-new" to="/new">
-            <PlusIcon /> Nouvelle vidéo
+            <PlusIcon /> {t("Nouvelle vidéo")}
           </Link>
         </header>
         {(page === undefined || page.total > 0 || filtered) && (
           <div className="library-tools">
             <label className="search input-search">
-              <span className="sr-only">Rechercher une vidéo</span>
+              <span className="sr-only">{t("Rechercher une vidéo")}</span>
               <SearchIcon />
               <input
                 className="input"
                 type="search"
-                placeholder="Rechercher par titre ou sujet"
+                placeholder={t("Rechercher par titre ou sujet")}
                 value={search}
                 onChange={(e) => refine(() => setSearch(e.target.value))}
               />
             </label>
             <Pills
-              legend="Afficher"
+              legend={t("Afficher")}
               name="status"
               hideLegend
               options={STATUS_FILTERS}
@@ -85,8 +87,8 @@ export default function Projects() {
               onChange={(v) => refine(() => setStatus(v))}
             />
             <label className="sort">
-              <span className="sr-only">Trier par</span>
-              <select className="input" aria-label="Trier par" value={sort} onChange={(e) => refine(() => setSort(e.target.value as Sort))}>
+              <span className="sr-only">{t("Trier par")}</span>
+              <select className="input" aria-label={t("Trier par")} value={sort} onChange={(e) => refine(() => setSort(e.target.value as Sort))}>
                 {SORTS.map((s) => (
                   <option key={s} value={s}>
                     {SORT_LABELS[s]}
@@ -103,7 +105,7 @@ export default function Projects() {
         )}
         {error && <ErrorState message={error} onRetry={reload} />}
         {!error && !projects && (
-          <ul className="cards" aria-busy="true" aria-label="Chargement des vidéos">
+          <ul className="cards" aria-busy="true" aria-label={t("Chargement des vidéos")}>
             {Array.from({ length: 5 }, (_, i) => (
               <li key={i} className="card-skeleton" />
             ))}
@@ -112,16 +114,16 @@ export default function Projects() {
         {!error && projects?.length === 0 && !filtered && (
           <div className="library-empty library-welcome">
             <ProjectsIcon />
-            <h2>Aucune vidéo pour l'instant</h2>
-            <p className="muted">Décrivez une idée : le script, les clips, la voix et le montage se génèrent étape par étape.</p>
+            <h2>{t("Aucune vidéo pour l'instant")}</h2>
+            <p className="muted">{t("Décrivez une idée : le script, les clips, la voix et le montage se génèrent étape par étape.")}</p>
             <Link className="btn btn-primary" to="/new">
-              <PlusIcon /> Nouvelle vidéo
+              <PlusIcon /> {t("Nouvelle vidéo")}
             </Link>
           </div>
         )}
         {!error && projects?.length === 0 && filtered && (
           <div className="library-empty">
-            <p>Aucune vidéo ne correspond à cette recherche.</p>
+            <p>{t("Aucune vidéo ne correspond à cette recherche.")}</p>
             <button
               className="btn"
               onClick={() =>
@@ -131,7 +133,7 @@ export default function Projects() {
                 })
               }
             >
-              Effacer la recherche et les filtres
+              {t("Effacer la recherche et les filtres")}
             </button>
           </div>
         )}
@@ -153,9 +155,9 @@ export default function Projects() {
 
       {deleting && (
         <ConfirmDialog
-          title="Supprimer la vidéo ?"
-          message={`« ${deleting.title} » sera supprimée avec ses clips, voix et rendus. Cette action est définitive.`}
-          confirmLabel="Supprimer"
+          title={t("Supprimer la vidéo ?")}
+          message={t("« {title} » sera supprimée avec ses clips, voix et rendus. Cette action est définitive.", { title: deleting.title })}
+          confirmLabel={t("Supprimer")}
           onConfirm={() => remove(deleting)}
           onCancel={() => setDeleting(null)}
         />
@@ -169,8 +171,8 @@ function ProjectTile({ project: p, onDelete }: { project: ProjectCard; onDelete:
   const state = cardState(p);
   const segments = progress(p.current_step);
   const position = p.current_step
-    ? `Étape ${STEP_ORDER.indexOf(p.current_step) + 1} sur 8 : ${STEP_LABELS[p.current_step]}`
-    : "8 étapes sur 8";
+    ? t("Étape {n} sur 8 : {step}", { n: STEP_ORDER.indexOf(p.current_step) + 1, step: STEP_LABELS[p.current_step] })
+    : t("8 étapes sur 8");
   return (
     <li className={`card st-${state.tone}${state.live ? " is-live" : ""}`}>
       <div className="card-frame">
@@ -179,7 +181,7 @@ function ProjectTile({ project: p, onDelete }: { project: ProjectCard; onDelete:
         ) : (
           <span className="card-empty">
             <ProjectsIcon />
-            Pas encore de clip
+            {t("Pas encore de clip")}
           </span>
         )}
       </div>
@@ -193,18 +195,18 @@ function ProjectTile({ project: p, onDelete }: { project: ProjectCard; onDelete:
       </div>
       <p className="card-meta">
         <span className="card-state">{state.label}</span>
-        {p.cost_usd > 0 && (
-          <span className="muted" title="Dépensé sur cette vidéo">
-            {usd.format(p.cost_usd)}
+        {(p.cost_usd ?? p.credits_spent ?? 0) > 0 && (
+          <span className="muted" title={t("Dépensé sur cette vidéo")}>
+            {p.cost_usd !== null ? usd.format(p.cost_usd) : formatCredits(p.credits_spent ?? 0)}
           </span>
         )}
       </p>
       {p.render_asset_id !== null && (
         <a className="card-export" href={`/api/projects/${p.id}/assets/${p.render_asset_id}/download`}>
-          <DownloadIcon /> Exporter
+          <DownloadIcon /> {t("Exporter")}
         </a>
       )}
-      <button className="card-delete" onClick={onDelete} aria-label={`Supprimer « ${p.title} »`} title="Supprimer">
+      <button className="card-delete" onClick={onDelete} aria-label={t("Supprimer « {name} »", { name: p.title })} title={t("Supprimer")}>
         <TrashIcon />
       </button>
     </li>

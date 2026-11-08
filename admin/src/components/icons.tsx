@@ -63,6 +63,15 @@ export const CoinIcon = () => (
   </Icon>
 );
 
+/** Trois marches montantes : les forfaits. */
+export const PlansIcon = () => (
+  <Icon>
+    <rect x="3" y="13" width="5" height="8" rx="1" />
+    <rect x="9.5" y="8" width="5" height="13" rx="1" />
+    <rect x="16" y="3" width="5" height="18" rx="1" />
+  </Icon>
+);
+
 export const LogoutIcon = () => (
   <Icon>
     <path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H3" />

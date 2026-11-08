@@ -1,0 +1,19 @@
+# HTTPS automatique (Let's Encrypt). DOMAIN vient de deploy/.env.
+{$DOMAIN} {
+	encode zstd gzip
+	handle /api/* {
+		reverse_proxy api:8000 {
+			flush_interval -1 # flux SSE (/api/events) transmis sans tampon
+		}
+	}
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# Fichiers (URLs présignées) : l'hôte est transmis tel quel à MinIO, qui l'a signé.
+s3.{$DOMAIN} {
+	reverse_proxy minio:9000
+}

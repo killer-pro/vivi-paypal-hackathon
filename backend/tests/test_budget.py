@@ -162,3 +162,30 @@ async def test_a_gemini_start_image_adds_its_cost_to_the_launch_estimate(api, se
     r = await api.post(f"/api/projects/{pid}/steps/clips/run", json={**query, "start_image": "gemini"})
     assert r.status_code == 409 and "à venir" in r.json()["detail"] and api.enqueued == []
     assert (await api.post(f"/api/projects/{pid}/steps/clips/run", json=query)).status_code == 202
+
+
+async def test_client_project_has_credits_spent_no_dollars(api_as, make_user, fund, session):
+    from app.models import CreditReservation
+    from tests.test_launch_credits import client_project
+    user, c, pid = await client_project(api_as, make_user, fund)
+    session.add(ProviderCall(project_id=pid, step="clips", provider="fal", model="k", cost_usd=1.5, status="ok"))
+    session.add_all([CreditReservation(user_id=user.id, project_id=pid, step="idea", amount=5, parts={}, status="closed", used=3),
+                     CreditReservation(user_id=user.id, project_id=pid, step="clips", amount=40, parts={}, status="open")])
+    await session.commit()
+    detail = (await c.get(f"/api/projects/{pid}")).json()
+    assert detail["credits_spent"] == 43
+    assert detail["cost_usd"] is None and detail["cost_by_step"] is None and detail["budget_usd"] is None
+    (item,) = (await c.get("/api/projects")).json()["items"]
+    assert item["credits_spent"] == 43 and item["cost_usd"] is None
+    assert (await c.get(f"/api/projects/{pid}/estimate")).json()["cost_usd"] is None
+    session.add(Asset(project_id=pid, kind="reference", key="r.png", content_type="image/png",
+                      meta={"model": "flux", "cost_usd": 0.04, "ref": "lea"}))
+    await session.commit()
+    (asset,) = (await c.get(f"/api/projects/{pid}")).json()["assets"]
+    assert asset["meta"] == {"model": "flux", "ref": "lea"}  # pas de coût en dollars dans les fichiers
+
+
+async def test_admin_project_keeps_dollars(api, session):
+    pid = await new_project(api)
+    detail = (await api.get(f"/api/projects/{pid}")).json()
+    assert detail["cost_usd"] == 0 and detail["budget_usd"] is not None and detail["credits_spent"] is None

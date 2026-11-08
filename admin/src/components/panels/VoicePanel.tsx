@@ -13,6 +13,7 @@ import { parseVoices, voiceLabel, withCurrent } from "../../settings";
 import { Field } from "../ui";
 import SceneFocus from "./SceneFocus";
 import VoiceTextEditor from "./VoiceTextEditor";
+import { t, tn } from "../../i18n";
 
 /** Voix off : choix de la voix (catalogue des réglages), texte, écoute et régénération de la scène sélectionnée. */
 export default function VoicePanel(props: PanelProps) {
@@ -34,10 +35,10 @@ export default function VoicePanel(props: PanelProps) {
   return (
     <StepPanel
       {...props}
-      runLabel={hasResult(step) ? "Régénérer toutes les voix" : "Générer les voix"}
+      runLabel={hasResult(step) ? t("Régénérer toutes les voix") : t("Générer les voix")}
       onRun={() => flow.run("voice", undefined, params)}
       onResume={() => flow.run("voice", undefined, { ...params, overrides: { resume: true } })}
-      confirmRun={`Les ${project.scenes.length} voix sont régénérées (appels payants) et remplacent les actuelles.`}
+      confirmRun={t("Les {n} voix sont régénérées (appels payants) et remplacent les actuelles.", { n: project.scenes.length })}
       extraActions={
         withoutVoice > 0 &&
         step.status !== "pending" && (
@@ -45,23 +46,23 @@ export default function VoicePanel(props: PanelProps) {
             className="btn"
             onClick={() =>
               confirm({
-                title: `Générer ${withoutVoice} voix ?`,
-                message: `${withoutVoice} appel${withoutVoice > 1 ? "s" : ""} à la voix de synthèse (payant selon votre abonnement). Les voix existantes ne sont pas touchées.`,
-                confirmLabel: "Générer",
+                title: tn(withoutVoice, "Générer {n} voix ?", "Générer {n} voix ?"),
+                message: t(withoutVoice > 1 ? "{n} appels à la voix de synthèse (payant selon votre abonnement). Les voix existantes ne sont pas touchées." : "{n} appel à la voix de synthèse (payant selon votre abonnement). Les voix existantes ne sont pas touchées.", { n: withoutVoice }),
+                confirmLabel: t("Générer"),
                 onConfirm: () => flow.run("voice", undefined, { ...params, overrides: { only_missing: true } }),
               })
             }
             disabled={!canRun || locked}
           >
-            {priceLabel(`Générer les ${withoutVoice} voix manquante${withoutVoice > 1 ? "s" : ""}`, missingPrice)}
+            {priceLabel(tn(withoutVoice, "Générer la voix manquante", "Générer les {n} voix manquantes"), missingPrice)}
           </button>
         )
       }
     >
-      <Field label="Voix">
+      <Field label={t("Voix")}>
         <select className="input" value={voiceId.value} onChange={(e) => voiceId.set(e.target.value)}>
           <option value="">
-            {defaultVoice ? `Voix par défaut (${voiceLabel(catalog, defaultVoice)})` : "Voix par défaut (non choisie)"}
+            {defaultVoice ? t("Voix par défaut ({voice})", { voice: voiceLabel(catalog, defaultVoice) }) : t("Voix par défaut (non choisie)")}
           </option>
           {withCurrent(catalog.map((v) => v.id), voiceId.value).map((id) => (
             <option key={id} value={id}>
@@ -72,7 +73,7 @@ export default function VoicePanel(props: PanelProps) {
       </Field>
       {!defaultVoice && !catalog.length && (
         <p className="muted">
-          Aucune voix au catalogue. <Link to="/providers">Ajouter des voix dans les Réglages</Link>
+          Aucune voix au catalogue. <Link to="/providers">{t("Ajouter des voix dans les Réglages")}</Link>
         </p>
       )}
       <SceneFocus scene={scene} count={project.scenes.length} hideText>
@@ -87,9 +88,9 @@ export default function VoicePanel(props: PanelProps) {
           />
         )}
         {voice ? (
-          <AudioPlayer src={voice.url} label={`Voix de la scène ${scene.position}`} />
+          <AudioPlayer src={voice.url} label={t("Voix de la scène {n}", { n: scene.position })} />
         ) : (
-          <p className="empty-line">Pas encore de voix pour cette scène.</p>
+          <p className="empty-line">{t("Pas encore de voix pour cette scène.")}</p>
         )}
         {scene && (
           <div>
@@ -99,16 +100,16 @@ export default function VoicePanel(props: PanelProps) {
                 const run = () => flow.run("voice", scene.id, params);
                 if (!voice) return run();
                 confirm({
-                  title: "Régénérer cette voix ?",
-                  message: `La voix de la scène ${scene.position} est régénérée (appel payant) et remplace l'actuelle.`,
-                  confirmLabel: "Régénérer",
+                  title: t("Régénérer cette voix ?"),
+                  message: t("La voix de la scène {n} est régénérée (appel payant) et remplace l'actuelle.", { n: scene.position }),
+                  confirmLabel: t("Régénérer"),
                   onConfirm: run,
                 });
               }}
               disabled={!previousApproved || runLocked}
               title={step.status === "running" ? QUEUE_HINT : undefined}
             >
-              {step.status === "running" ? QUEUE_LABEL : priceLabel(voice ? "Régénérer cette voix" : "Générer cette voix", scenePrice)}
+              {step.status === "running" ? QUEUE_LABEL : priceLabel(voice ? t("Régénérer cette voix") : t("Générer cette voix"), scenePrice)}
             </button>
             <PriceNote quote={scenePrice} />
           </div>

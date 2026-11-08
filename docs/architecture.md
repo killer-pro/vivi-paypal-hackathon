@@ -5,7 +5,7 @@
 |---|---|---|
 | API FastAPI | Auth par cookie, projets, étapes, musique, réglages, coûts, SSE | `backend/app/main.py`, `backend/app/api/` |
 | Worker Arq | Exécute `run_step_job` (appels providers, FFmpeg) ; `queue.py` : un client Redis par boucle d'événements | `backend/app/worker.py`, `backend/app/queue.py` |
-| Pipeline | `run_step` et les 8 exécuteurs | `backend/app/services/pipeline.py` |
+| Pipeline | `run_step` et les 8 exécuteurs | `backend/app/services/pipeline.py` (+ `prompts.py`, `script_parsing.py`, `timeouts.py`, `choices.py`) |
 | Lancement / autopilot | `launch_step` (API et worker), mode automatique | `backend/app/services/steps.py` |
 | État du flow | Lecture des étapes, péremption (`stale`), statut du projet, 409 si une étape tourne | `backend/app/services/flow.py` |
 | Budget | Plafond de dépense par projet, coût estimé des clips | `backend/app/services/budget.py` |

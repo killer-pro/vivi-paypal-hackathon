@@ -1,24 +1,7 @@
-/* Abonnement et recharges : l'abonnement en tête (accent sur son seul bouton), puis les packs de crédits. */
-.billing {
-  display: grid;
-  gap: 12px;
-  margin-bottom: 28px;
-}
-
-.billing-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 16px;
-}
-
-.billing-head .btn {
-  margin-left: auto;
-}
-
+/* Recharges : packs de crédits côte à côte. */
 .billing-offers {
   display: grid;
-  grid-template-columns: minmax(240px, 1.4fr) repeat(auto-fit, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   gap: 12px;
 }
 
@@ -40,6 +23,165 @@
 
 @media (max-width: 720px) {
   .billing-offers {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Page Forfaits : trois cartes côte à côte, le forfait du compte cerné d'accent ; la bande de cadres 9:16 dit combien
+   de vidéos de 30 s paient les crédits du mois (couleur des clips, seul élément coloré des cartes). */
+.plans-page {
+  display: grid;
+  gap: 20px;
+}
+
+.plans-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+  margin: -8px 0 0;
+}
+
+.plans-tiers {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.plan-card {
+  display: grid;
+  grid-template-rows: auto auto auto auto 1fr auto;
+  gap: 6px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--panel);
+}
+
+.plan-card.is-current {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.plan-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.plan-card-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.plan-card-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.plan-card-price {
+  margin: 4px 0 0;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-card p {
+  margin: 0;
+}
+
+.plan-strip {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 4px;
+  font-size: 13px;
+}
+
+.plan-strip-frames {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  min-height: 14px;
+}
+
+.plan-strip-frames > span:not(.plan-strip-more) {
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--track-clip);
+}
+
+.plan-strip-more {
+  margin-left: 4px;
+  line-height: 14px;
+  color: var(--track-clip);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-perks {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+  font-size: 13px;
+}
+
+.plan-perks li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.plan-perks svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: var(--muted);
+}
+
+.plan-card-actions {
+  display: grid;
+  margin-top: 12px;
+  font-size: 13px;
+}
+
+.plans-free {
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-m);
+  font-size: 13px;
+}
+
+.plans-packs {
+  display: grid;
+  gap: 8px;
+}
+
+.plans-packs h2 {
+  margin: 8px 0 0;
+  font-size: 16px;
+}
+
+.plans-packs p {
+  margin: 0;
+}
+
+
+@media (max-width: 900px) {
+  .plans-tiers {
     grid-template-columns: 1fr;
   }
 }

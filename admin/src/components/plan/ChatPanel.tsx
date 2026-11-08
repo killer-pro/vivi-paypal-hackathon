@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { api, errorMessage, useApi, type PlanMessage } from "../../api";
 import { chatBlockedReason, lastUndoable } from "../../planChat";
 import TextArea from "../TextArea";
+import { t } from "../../i18n";
 
 interface Props {
   projectId: number;
@@ -69,13 +70,12 @@ export default function ChatPanel({ projectId, dirty, running, onPlanChanged }: 
   };
 
   return (
-    <section className="chat" aria-label="Discuter du plan avec l'IA">
-      <h2>Discuter du plan</h2>
+    <section className="chat" aria-label={t("Discuter du plan avec l'IA")}>
+      <h2>{t("Discuter du plan")}</h2>
       <ol className="chat-log" ref={log} aria-live="polite">
         {messages?.length === 0 && (
           <li className="chat-empty muted">
-            Demandez un changement (« raccourcis la scène 2 », « ajoute une scène sur le prix ») ou posez une question
-            sur le plan.
+            {t("Demandez un changement (« raccourcis la scène 2 », « ajoute une scène sur le prix ») ou posez une question sur le plan.")}
           </li>
         )}
         {loadError && <li className="error">{loadError}</li>}
@@ -84,15 +84,15 @@ export default function ChatPanel({ projectId, dirty, running, onPlanChanged }: 
             <p>{m.content}</p>
             {m.id === undoable?.id && (
               <span className="chat-changed">
-                Plan modifié
+                {t("Plan modifié")}
                 <button type="button" className="btn btn-ghost btn-small" onClick={() => undo(m)} disabled={busy || running}>
-                  Annuler
+                  {t("Annuler")}
                 </button>
               </span>
             )}
           </li>
         ))}
-        {busy && <li className="chat-message chat-assistant chat-wait muted">L'IA réfléchit…</li>}
+        {busy && <li className="chat-message chat-assistant chat-wait muted">{t("L'IA réfléchit…")}</li>}
       </ol>
       {error && (
         <p className="error" role="alert">
@@ -104,15 +104,15 @@ export default function ChatPanel({ projectId, dirty, running, onPlanChanged }: 
           className="input"
           rows={2}
           maxLength={2000}
-          aria-label="Message pour l'IA"
-          placeholder="Que voulez-vous changer ?"
+          aria-label={t("Message pour l'IA")}
+          placeholder={t("Que voulez-vous changer ?")}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={onKeyDown}
         />
         {blocked && <p className="muted chat-blocked">{blocked}</p>}
         <button className="btn" disabled={busy || !text.trim() || blocked !== null}>
-          Envoyer
+          {t("Envoyer")}
         </button>
       </form>
     </section>

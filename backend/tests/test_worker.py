@@ -100,7 +100,7 @@ async def test_job_timeout_argument_fails_step_without_reraising(session, events
 
 
 def test_arq_limit_never_cuts_a_sized_job_first():
-    from app.services.pipeline import MAX_JOB_TIMEOUT
+    from app.services.timeouts import MAX_JOB_TIMEOUT
 
     assert worker.WorkerSettings.job_timeout > MAX_JOB_TIMEOUT
 

@@ -76,5 +76,5 @@ async def test_adjust_rejections(admin_client, admin, session, make_user):
 
 async def test_margins_route(admin_client):
     body = (await admin_client.get("/api/admin/margins")).json()
-    assert body["rows"] == [] and body["usd_per_credit"] == 0.05 and body["margin"] == 2.5
+    assert body["rows"] == [] and body["usd_per_credit"] == 0.01 and body["margin"] == 3
     assert body["totals"] == {"cost_usd": 0, "credits": 0, "revenue_usd": 0, "ratio": None}

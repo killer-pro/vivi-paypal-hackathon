@@ -2,6 +2,7 @@ import json
 import re
 import subprocess
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 
 from app.providers.base import Availability, GenerationResult, ProviderError, TextResult, ensure_non_empty
@@ -148,13 +149,14 @@ class FakeVideo:
     name = "fake-video"
 
     def __init__(self, fail_with: ProviderError | None = None, models: list[str] | None = None,
-                 keyframe: bytes | None = None):
+                 keyframe: bytes | None = None, cost: Callable[[str, float], float] | None = None):
         self.fail_with = fail_with
         self.models = models or ["fake-video"]
         self.keyframe = keyframe
+        self.cost = cost
 
     def estimate_cost(self, model: str, duration_s: float) -> float:
-        return round(0.05 * duration_s, 4)
+        return self.cost(model, duration_s) if self.cost else round(0.05 * duration_s, 4)
 
     async def generate(self, prompt, *, model, duration_s, image=None, references=(), start_image=None) -> GenerationResult:
         if self.fail_with:

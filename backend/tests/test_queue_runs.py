@@ -1,6 +1,8 @@
 from app.app_settings import AppSettings
-from app.services.queue_runs import MAX_QUEUED, dispatch_queue
+from app.services.queue_runs import dispatch_queue
+from tests.test_access_enforcement import subscribe
 from tests.test_api_steps import new_project, set_status, statuses
+from tests.test_launch_credits import add_scenes, client_project
 
 
 async def clips_running(api, session):
@@ -41,14 +43,39 @@ def api_enqueue(api):
     return enqueue
 
 
-async def test_queue_is_full_after_five_and_identical_requests_are_not_repeated(api, session):
+async def client_clips_running(api_as, make_user, fund, session):
+    """Projet d'un client dont les clips tournent, et les scènes de quoi mettre des demandes en file."""
+    user, c, pid = await client_project(api_as, make_user, fund)
+    scene_ids = await add_scenes(session, pid, 4)
+    await set_status(session, ["idea", "story", "script", "reference"], "approved")
+    await AppSettings(session).set("default_video_provider", "comfyui")
+    assert (await c.post(f"/api/projects/{pid}/steps/clips/run", json={})).status_code == 202
+    return user, c, pid, scene_ids
+
+
+async def test_free_queue_holds_one_request(api_as, make_user, fund, session):
+    user, c, pid, scenes = await client_clips_running(api_as, make_user, fund, session)
+    assert (await c.post(f"/api/projects/{pid}/steps/clips/run", json={"scene_id": scenes[0]})).status_code == 202
+    assert (await c.post(f"/api/projects/{pid}/steps/clips/run", json={"scene_id": scenes[0]})).json() == {"queued": True}
+    full = await c.post(f"/api/projects/{pid}/steps/clips/run", json={"scene_id": scenes[1]})
+    detail = full.json()["detail"]
+    assert full.status_code == 409 and "File d'attente pleine" in detail and "forfait Starter : 2 demandes en file" in detail
+
+
+async def test_starter_queue_holds_two(api_as, make_user, fund, session):
+    user, c, pid, scenes = await client_clips_running(api_as, make_user, fund, session)
+    await subscribe(session, user, plan_id="starter")
+    for scene_id in scenes[:2]:
+        assert (await c.post(f"/api/projects/{pid}/steps/clips/run", json={"scene_id": scene_id})).status_code == 202
+    assert len(await queue(c, pid)) == 2
+    assert (await c.post(f"/api/projects/{pid}/steps/clips/run", json={"scene_id": scenes[2]})).status_code == 409
+
+
+async def test_admin_queue_is_not_limited(api, session):
     pid = await clips_running(api, session)
-    for scene_id in range(1, MAX_QUEUED + 1):
+    for scene_id in range(1, 11):
         assert (await api.post(f"/api/projects/{pid}/steps/clips/run", json={"scene_id": scene_id})).status_code == 202
-    assert (await api.post(f"/api/projects/{pid}/steps/clips/run", json={"scene_id": 1})).json() == {"queued": True}
-    assert len(await queue(api, pid)) == MAX_QUEUED
-    full = await api.post(f"/api/projects/{pid}/steps/clips/run", json={"scene_id": 99})
-    assert full.status_code == 409 and "File d'attente pleine" in full.json()["detail"]
+    assert len(await queue(api, pid)) == 10
 
 
 async def test_remove_from_queue(api, session):

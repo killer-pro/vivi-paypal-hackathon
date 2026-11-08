@@ -1,10 +1,11 @@
+import { t } from "./i18n";
 /** Compte connecté (`GET /auth/me`). */
 export type Me = { id: number; email: string; role: "user" | "admin"; email_verified: boolean; subscribed: boolean; subscription_ends_at: string | null };
 
 /** Mêmes bornes que le backend (`app/security.py`). */
 export const PASSWORD_MIN = 8;
 export const PASSWORD_MAX = 128;
-export const PASSWORD_RULE = `Le mot de passe doit compter de ${PASSWORD_MIN} à ${PASSWORD_MAX} caractères`;
+export const PASSWORD_RULE = t("Le mot de passe doit compter de {min} à {max} caractères", { min: PASSWORD_MIN, max: PASSWORD_MAX });
 
 /** Écrans accessibles sans session : un 401 n'y renvoie pas vers `/login`. */
 const PUBLIC_PATHS = new Set(["/decouvrir", "/login", "/register", "/verify", "/forgot", "/reset"]);

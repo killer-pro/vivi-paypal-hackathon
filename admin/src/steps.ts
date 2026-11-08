@@ -1,4 +1,5 @@
 import type { Asset, Scene } from "./api";
+import { t } from "./i18n";
 
 /** Noms et statuts alignés sur le backend (`app/state.py`). */
 export const STEP_ORDER = ["idea", "story", "script", "reference", "clips", "voice", "music", "montage", "final"] as const;
@@ -28,24 +29,24 @@ export interface Step {
 export const STOPPED_BY_USER = "Arrêtée par l'utilisateur";
 
 export const STEP_LABELS: Record<StepName, string> = {
-  idea: "Idée",
-  story: "Histoire et éléments",
-  script: "Script et scènes",
-  reference: "Image de référence",
-  clips: "Clips",
-  voice: "Voix off",
-  music: "Musique",
-  montage: "Montage",
-  final: "Rendu final",
+  idea: t("Idée"),
+  story: t("Histoire et éléments"),
+  script: t("Script et scènes"),
+  reference: t("Image de référence"),
+  clips: t("Clips"),
+  voice: t("Voix off"),
+  music: t("Musique"),
+  montage: t("Montage"),
+  final: t("Rendu final"),
 };
 
 export const STATUS_LABELS: Record<StepStatus, string> = {
-  pending: "À lancer",
-  running: "En cours",
-  awaiting_validation: "À valider",
-  approved: "Validée",
-  failed: "En échec",
-  stale: "Périmée",
+  pending: t("À lancer"),
+  running: t("En cours"),
+  awaiting_validation: t("À valider"),
+  approved: t("Validée"),
+  failed: t("En échec"),
+  stale: t("Périmée"),
 };
 
 /** Étape optionnelle : en `pending`, elle n'empêche pas d'avancer. */
@@ -140,15 +141,14 @@ export function hasResult(step: Pick<Step, "result">): boolean {
 
 /** Libellé affiché d'un statut ; l'étape optionnelle est « Facultative » en attente, « Ignorée » si validée sans résultat. */
 export function statusLabel(step: Pick<Step, "name" | "status" | "result">): string {
-  if (step.name === OPTIONAL_STEP && step.status === "pending") return "Facultative";
-  if (step.name === OPTIONAL_STEP && step.status === "approved" && !hasResult(step)) return "Ignorée";
+  if (step.name === OPTIONAL_STEP && step.status === "pending") return t("Facultative");
+  if (step.name === OPTIONAL_STEP && step.status === "approved" && !hasResult(step)) return t("Ignorée");
   return STATUS_LABELS[step.status];
 }
 
 /** Reprise d'une étape par scène en échec : scènes restantes et phrase d'état (« 3 scènes sur 10 déjà générées »). */
 export function resumeInfo({ done, total }: { done: number; total: number }): { remaining: number; text: string } {
-  const plural = done > 1 ? "s" : "";
-  return { remaining: Math.max(total - done, 0), text: `${done} scène${plural} sur ${total} déjà générée${plural}` };
+  return { remaining: Math.max(total - done, 0), text: t(done > 1 ? "{done} scènes sur {total} déjà générées" : "{done} scène sur {total} déjà générée", { done, total }) };
 }
 
 /** Scènes sans aucun média du type (clip, voix) : `only_missing` ne génère que celles-là, sans toucher aux autres. */

@@ -53,7 +53,7 @@ def test_i2v_reads_the_uploaded_image():
 
 
 def test_keyframe_size_is_576x1008():
-    wf = keyframe_workflow(get_profile("precision"), "un chat", 5)
+    wf = keyframe_workflow("un chat", 5)
     (latent,) = nodes(wf, "EmptySD3LatentImage")
     assert (latent["inputs"]["width"], latent["inputs"]["height"]) == (576, 1008)
     assert nodes(wf, "KSampler")[0]["inputs"]["seed"] == 5
