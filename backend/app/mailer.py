@@ -4,8 +4,10 @@ import smtplib
 import ssl
 from dataclasses import dataclass
 from email.message import EmailMessage
+from email.utils import parseaddr
 from typing import Protocol
 
+import httpx
 from fastapi import Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +20,8 @@ logger = logging.getLogger("app.mailer")
 SMTP_PLAIN_PORT = 25  # STARTTLS seulement s'il y a des identifiants (relais local sans authentification)
 SMTPS_PORT = 465  # TLS dès la connexion
 SMTP_TIMEOUT_S = 15
+BREVO_URL = "https://api.brevo.com/v3/smtp/email"
+BREVO_TIMEOUT_S = 15
 
 
 @dataclass
@@ -69,10 +73,33 @@ class SmtpMailer:
             smtp.send_message(message)
 
 
+class BrevoMailer:
+    """Envoi par l'API HTTP de Brevo (port 443 : passe là où un hébergeur bloque le SMTP). `sender` au format
+    « Nom <adresse> » ou adresse seule ; l'adresse doit être un expéditeur validé dans Brevo."""
+
+    def __init__(self, api_key: str, sender: str, transport: httpx.AsyncBaseTransport | None = None):
+        self.api_key, self.sender, self._transport = api_key, sender, transport  # transport : tests
+
+    def payload(self, mail: Mail) -> dict:
+        name, email = parseaddr(self.sender)
+        return {"sender": {"email": email, **({"name": name} if name else {})}, "to": [{"email": mail.to}],
+                "subject": mail.subject, "textContent": mail.body}
+
+    async def send(self, mail: Mail) -> None:
+        async with httpx.AsyncClient(timeout=BREVO_TIMEOUT_S, transport=self._transport) as client:
+            response = await client.post(BREVO_URL, json=self.payload(mail),
+                                         headers={"api-key": self.api_key, "accept": "application/json"})
+        response.raise_for_status()  # le corps de la réponse n'est pas journalisé : il peut citer le message
+
+
 async def get_mailer(session: AsyncSession = Depends(get_session)) -> Mailer:
+    """Faux envoi en mode factice ; sinon Brevo si sa clé est renseignée, à défaut SMTP."""
     if settings.fake_providers:
         return FakeMailer()
     app_settings = AppSettings(session)
+    brevo_key = await app_settings.get("brevo_api_key")
+    if brevo_key:
+        return BrevoMailer(brevo_key, await app_settings.get("brevo_sender"))
     host = await app_settings.get("smtp_host")
     if not host:
         raise HTTPException(503, "L'envoi d'e-mails n'est pas configuré (Réglages)")

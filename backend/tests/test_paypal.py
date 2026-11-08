@@ -239,13 +239,40 @@ async def test_unknown_tier_404(api_as, make_user, paypal):
     assert r.status_code == 404 and paypal.calls == []
 
 
-@pytest.mark.parametrize("setup", ["no_plan", "subscribed"])
-async def test_tier_without_paypal_plan_409(api_as, make_user, paypal, session, setup):
+async def test_tier_without_paypal_plan_409(api_as, make_user, paypal):
     c = await api_as(await make_user("a@x.fr"))
-    if setup == "subscribed":
-        await c.post("/api/billing/paypal/subscription/confirm", json={"subscription_id": await subscribe(c, paypal)})
-    tier = "pro" if setup == "no_plan" else "creator"  # Pro n'a pas de plan PayPal
-    assert (await c.post("/api/billing/paypal/subscription", json={"tier_id": tier})).status_code == 409
+    assert (await c.post("/api/billing/paypal/subscription", json={"tier_id": "pro"})).status_code == 409  # Pro n'a pas de plan PayPal
+
+
+async def test_resubscribing_to_the_renewing_tier_409(api_as, make_user, paypal):
+    c = await api_as(await make_user("a@x.fr"))
+    await c.post("/api/billing/paypal/subscription/confirm", json={"subscription_id": await subscribe(c, paypal)})
+    assert (await c.post("/api/billing/paypal/subscription", json={"tier_id": "starter"})).status_code == 409
+
+
+async def test_switching_tier_replaces_the_subscription_once_the_new_one_is_paid(api_as, make_user, paypal, session):
+    c = await api_as(user := await make_user("a@x.fr"))
+    old = await subscribe(c, paypal)
+    await c.post("/api/billing/paypal/subscription/confirm", json={"subscription_id": old})
+    new = await subscribe(c, paypal, tier_id="creator")
+    r = await c.post("/api/billing/paypal/subscription/confirm", json={"subscription_id": new})
+    assert r.json() == {"activated": True, "credited": 3000} and ("cancel", old) in paypal.calls
+    await session.refresh(user)
+    assert user.plan_id == "creator" and user.paypal_subscription_id == new
+    assert await subscription_balance(session, user) == 3000  # le quota du nouveau forfait remplace l'ancien
+    cancelled = {"id": "WH-C", "event_type": "BILLING.SUBSCRIPTION.CANCELLED", "resource": {"id": old}}
+    await (await api_as(None)).post("/api/paypal/webhook", json=cancelled)
+    await session.refresh(user)
+    assert user.paypal_subscription_id == new and (await c.get("/api/billing")).json()["paypal_cancellable"] is True
+
+
+async def test_abandoned_switch_keeps_the_current_subscription(api_as, make_user, paypal, session):
+    c = await api_as(user := await make_user("a@x.fr"))
+    old = await subscribe(c, paypal)
+    await c.post("/api/billing/paypal/subscription/confirm", json={"subscription_id": old})
+    assert (await c.post("/api/billing/paypal/subscription", json={"tier_id": "creator"})).status_code == 200  # jamais approuvé
+    await session.refresh(user)
+    assert user.paypal_subscription_id == old and user.plan_id == "starter" and ("cancel", old) not in paypal.calls
 
 
 async def test_confirming_someone_elses_subscription_is_refused(api_as, make_user, paypal, session):

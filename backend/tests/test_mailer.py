@@ -1,10 +1,12 @@
+import json
 import ssl
 
+import httpx
 import pytest
 from fastapi import HTTPException
 
 from app.config import settings
-from app.mailer import FakeMailer, Mail, SmtpMailer, get_mailer, reset_mail, verification_mail
+from app.mailer import BREVO_URL, BrevoMailer, FakeMailer, Mail, SmtpMailer, get_mailer, reset_mail, verification_mail
 
 
 async def test_fake_mailer_collects():
@@ -52,6 +54,53 @@ async def test_get_mailer_builds_smtp_from_settings(api, session, monkeypatch):
     assert isinstance(mailer, SmtpMailer)
     assert (mailer.host, mailer.port, mailer.user, mailer.password, mailer.sender) == (
         "smtp.test", 587, "u", "secret", "noreply@test")
+
+
+async def test_get_mailer_prefers_brevo_when_key_set(api, session, monkeypatch):
+    monkeypatch.setattr(settings, "fake_providers", False)
+    await api.put("/api/settings", json={"smtp_host": "smtp.test", "brevo_api_key": "xkeysib-1",
+                                         "brevo_sender": "Vivi <noreply@test>"})
+    mailer = await get_mailer(session)
+    assert isinstance(mailer, BrevoMailer) and (mailer.api_key, mailer.sender) == ("xkeysib-1", "Vivi <noreply@test>")
+
+
+async def test_brevo_key_comes_from_environment(session, monkeypatch):
+    monkeypatch.setattr(settings, "fake_providers", False)
+    monkeypatch.setattr(settings, "brevo_api_key", "xkeysib-env")
+    assert isinstance(await get_mailer(session), BrevoMailer)
+
+
+async def test_smtp_comes_from_environment(session, monkeypatch):
+    monkeypatch.setattr(settings, "fake_providers", False)
+    for key, value in {"smtp_host": "smtp.env", "smtp_user": "u", "smtp_password": "secret", "smtp_sender": ""}.items():
+        monkeypatch.setattr(settings, key, value)
+    mailer = await get_mailer(session)
+    assert isinstance(mailer, SmtpMailer) and (mailer.host, mailer.port, mailer.password, mailer.sender) == (
+        "smtp.env", 587, "secret", "u")
+
+
+async def test_brevo_mailer_posts_the_message():
+    requests = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(201, json={"messageId": "x"})
+
+    await BrevoMailer("xkeysib-1", "Vivi <noreply@test>", httpx.MockTransport(handler)).send(Mail("a@b.fr", "Sujet", "Corps"))
+    (request,) = requests
+    assert str(request.url) == BREVO_URL and request.headers["api-key"] == "xkeysib-1"
+    assert json.loads(request.content) == {"sender": {"email": "noreply@test", "name": "Vivi"}, "to": [{"email": "a@b.fr"}],
+                                           "subject": "Sujet", "textContent": "Corps"}
+
+
+async def test_brevo_mailer_raises_on_refusal():
+    transport = httpx.MockTransport(lambda request: httpx.Response(401, json={"code": "unauthorized"}))
+    with pytest.raises(httpx.HTTPStatusError):
+        await BrevoMailer("mauvaise", "noreply@test", transport).send(Mail("a@b.fr", "Sujet", "Corps"))
+
+
+async def test_brevo_sender_without_name():
+    assert BrevoMailer("k", "noreply@test").payload(Mail("a@b.fr", "S", "C"))["sender"] == {"email": "noreply@test"}
 
 
 async def test_smtp_settings_are_editable_and_password_masked(api):

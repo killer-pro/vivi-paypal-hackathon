@@ -1,7 +1,7 @@
 # Comptes, vérification d'e-mail et isolation
 
 Lot 1 de la logique SaaS : chaque personne a son compte et ne voit que ses projets. Conception complète (crédits,
-abonnement, recharges : lots suivants) ..
+abonnement, recharges : lots suivants) : [`docs/superpowers/specs/2026-11-01-saas-design.md`](superpowers/specs/2026-11-01-saas-design.md).
 Routes : `docs/api.md` ; règles de sécurité : `docs/securite.md`. Code : `backend/app/api/auth.py`, `security.py`,
 `mailer.py`, `api/projects.py`, `api/events.py`.
 
@@ -49,8 +49,10 @@ l'attaquant perd l'accès. Un compte déjà vérifié ne reçoit aucun e-mail à
 | `ADMIN_PASSWORD` | `change-me` | mot de passe initial de l'admin. **Sans `.env`, le défaut est `change-me` : à changer** (refus de démarrer hors `dev`) |
 | `PUBLIC_URL` | `http://localhost:5173` | base des liens des e-mails (`{PUBLIC_URL}/verify?token=…`, `/reset?token=…`) |
 
-Réglages SMTP (écran Réglages, admin ; table `settings`) : `smtp_host`, `smtp_port` (587 par défaut), `smtp_user`,
-`smtp_password` (chiffré au repos, masqué), `smtp_sender`. Sans `smtp_host`, aucun e-mail ne part. Le certificat et le
+Réglages SMTP (écran Réglages, admin ; table `settings`, ou à défaut `backend/.env` : `SMTP_HOST`, `SMTP_PORT`…) :
+`smtp_host`, `smtp_port` (587 par défaut), `smtp_user`, `smtp_password` (chiffré au repos, masqué), `smtp_sender`
+(défaut : `smtp_user`). Une clé Brevo (`brevo_api_key`) passe avant le SMTP ; sans l'une ni l'autre, aucun e-mail ne part.
+Brevo en SMTP : `smtp-relay.brevo.com`, port 587, identifiant `…@smtp-brevo.com`, mot de passe = clé SMTP (`xsmtpsib-…`). Le certificat et le
 nom d'hôte sont vérifiés ; port 465 : TLS implicite ; autres ports : `STARTTLS` obligatoire dès qu'un utilisateur est
 renseigné (seul le port 25 sans identifiants reste en clair). Voir `docs/settings-providers.md`.
 

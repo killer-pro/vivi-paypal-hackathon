@@ -4,7 +4,8 @@
 > (script, clips, voice, music, edit). For this hackathon we added **PayPal payments** so users pay for each AI
 > generation with credits: one-off **credit packs** (Orders v2: create, capture, verified webhook) and three monthly
 > **plans** (Starter, Créateur, Pro) billed with **PayPal Subscriptions**, each with its own credits and limits (queue,
-> references, video length, generation profiles). Everything runs locally with fake AI providers and the
+> references, video length, generation profiles). Subscribers can switch plans at any time: the new PayPal
+> subscription replaces the old one, cancelled at PayPal, once its first month is paid. Everything runs locally with fake AI providers and the
 > **PayPal sandbox**, no paid API key needed. The interface switches between French and English.
 >
 > ### Try it in 5 minutes

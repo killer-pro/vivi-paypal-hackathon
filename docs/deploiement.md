@@ -34,6 +34,8 @@ Fichiers : `deploy/docker-compose.yml`, `deploy/Caddyfile`, `admin/Dockerfile`, 
   Le compte démo (`demo@example.com`, abonnement sandbox de l'ancien plan unique) a les avantages du Starter.
 - Pas de ComfyUI sur le serveur (pas de GPU) : clips, image de départ et images de référence passent par Comfy Cloud
   (`default_video_provider=comfycloud`, `image_provider=comfycloud`), le texte par Groq.
+- E-mails : `BREVO_API_KEY` et `BREVO_SENDER` dans `backend/.env` (API Brevo), `SMTP_*` (SMTP Brevo) en secours ;
+  envoi vérifié depuis le conteneur de l'API le 2026-11-08.
 - DNS : un des résolveurs de Contabo ne répond pas (3 s perdues par requête, appels aux providers en échec au hasard).
   Docker utilise 1.1.1.1 et 8.8.8.8 (`/etc/docker/daemon.json`), le système aussi
   (`/etc/systemd/resolved.conf.d/dns.conf`).

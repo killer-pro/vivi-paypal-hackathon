@@ -18,12 +18,12 @@ from app.services.pricing import DEFAULT_PRICING, parse_pricing, positive_decima
 MASK = "••••"
 CREDIT_KEYS = ("credits_usd_per_credit", "credits_margin", "credits_signup_grant", "credits_reservation_timeout_min",
                "credits_pricing", "billing_config")
-SECRET_KEYS = {"anthropic_api_key", "gemini_api_key", "groq_api_key", "fal_key", "comfy_cloud_api_key", "elevenlabs_api_key", "langfuse_secret_key", "smtp_password",
+SECRET_KEYS = {"anthropic_api_key", "gemini_api_key", "groq_api_key", "fal_key", "comfy_cloud_api_key", "elevenlabs_api_key", "langfuse_secret_key", "smtp_password", "brevo_api_key",
                 "stripe_secret_key", "stripe_webhook_secret", "paypal_client_secret"}
 EDITABLE_KEYS = SECRET_KEYS | {"comfyui_url", "default_voice_id", "voice_catalog", "default_video_provider", "default_video_model",
                                "llm_provider", "gemini_model", "groq_model", "ollama_url", "ollama_model", "project_budget_usd", "image_provider",
                                "start_image_provider", "gemini_image_model", "langfuse_public_key", "langfuse_base_url",
-                               "smtp_host", "smtp_port", "smtp_user", "smtp_sender", "paypal_client_id", "paypal_webhook_id", "paypal_mode",
+                               "smtp_host", "smtp_port", "smtp_user", "smtp_sender", "brevo_sender", "paypal_client_id", "paypal_webhook_id", "paypal_mode",
                                *CREDIT_KEYS}
 # Choix par défaut que l'éditeur affiche (voix, modèles) : lisibles par tout compte, aucun secret ni adresse de service.
 EDITOR_KEYS = {"default_voice_id", "voice_catalog", "default_video_provider", "default_video_model", "image_provider",

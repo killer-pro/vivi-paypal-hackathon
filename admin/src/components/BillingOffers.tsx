@@ -15,6 +15,7 @@ import { formatCredits } from "../credits";
 import { perkLines, tierState } from "../plans";
 import { serverText } from "../serverText";
 import { CheckIcon } from "./icons";
+import { useConfirm } from "../hooks/useConfirm";
 import "./BillingOffers.css";
 import { t, tn } from "../i18n";
 
@@ -49,6 +50,7 @@ export default function BillingOffers({ onPaid }: { onPaid: () => void }) {
   const subscriptionId = returnedSub?.status === "success" ? returnedSub.subscriptionId : null;
   const [confirmation, setConfirmation] = useState<SubscriptionConfirmation | null>(null);
   const [cancelledSub, setCancelledSub] = useState(false);
+  const { confirm, dialog } = useConfirm();
 
   // Retour de PayPal : la commande approuvée se capture ici (et le webhook sert de filet si l'onglet se ferme avant).
   useConfirmOnce(orderId, (id) =>
@@ -164,12 +166,43 @@ export default function BillingOffers({ onPaid }: { onPaid: () => void }) {
               <div className="plan-card-actions">
                 {current ? (
                   billing.paypal_cancellable ? (
-                    <button className="btn btn-ghost" disabled={busy} onClick={cancelSubscription}>
+                    <button
+                      className="btn btn-ghost"
+                      disabled={busy}
+                      onClick={() =>
+                        confirm({
+                          title: t("Arrêter l'abonnement ?"),
+                          message: t(
+                            "Il ne sera plus renouvelé. Votre forfait et ses crédits restent jusqu'à la fin de la période déjà payée.",
+                          ),
+                          confirmLabel: t("Arrêter le renouvellement"),
+                          onConfirm: cancelSubscription,
+                        })
+                      }
+                    >
                       {t("Annuler mon abonnement PayPal")}
                     </button>
                   ) : (
                     <span className="muted">{t("Forfait actuel")}</span>
                   )
+                ) : billing.subscribed && tier.paypal_purchasable ? (
+                  <button
+                    className="btn"
+                    disabled={busy}
+                    onClick={() =>
+                      confirm({
+                        title: t("Passer au forfait {name} ?", { name: t(tier.name) }),
+                        message: t(
+                          "Le nouveau forfait démarre dès le paiement validé chez PayPal : {price}, {credits} qui remplacent les crédits d'abonnement restants (vos recharges sont gardées). L'abonnement actuel est arrêté, sans remboursement du mois en cours.",
+                          { price: serverText(tier.label), credits: formatCredits(tier.credits) },
+                        ),
+                        confirmLabel: t("Continuer vers PayPal"),
+                        onConfirm: () => go("/billing/paypal/subscription", { tier_id: tier.id }),
+                      })
+                    }
+                  >
+                    {t("Passer à ce forfait")}
+                  </button>
                 ) : billing.subscribed ? (
                   <span className="muted">{t("Pour changer, annulez votre forfait : le nouveau commence à la fin de la période.")}</span>
                 ) : tier.paypal_purchasable ? (
@@ -220,6 +253,7 @@ export default function BillingOffers({ onPaid }: { onPaid: () => void }) {
           ))}
         </div>
       </section>
+      {dialog}
     </>
   );
 }

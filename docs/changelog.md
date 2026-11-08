@@ -1,7 +1,10 @@
 # Changelog
 
-## 2026-11-08 (dépôt public, mise à jour)
-- Dépôt public mis à jour depuis le dépôt principal : forfaits Starter / Créateur / Pro en abonnements PayPal (un plan par forfait), crédits recalés, page « Forfaits », interface français / anglais, providers Groq et Comfy Cloud, compose de production (`deploy/`). Licence MIT ajoutée (`LICENSE`), README hackathon mis à jour.
+## 2026-11-08 (changement de forfait)
+- Un abonné PayPal peut changer de forfait (« Passer à ce forfait ») : le nouvel abonnement remplace l'ancien, annulé chez PayPal, dès son premier mois payé ; quota d'abonnement remplacé, recharges gardées. Annulation et changement demandent une confirmation. Doc : `abonnement.md`, `paiement.md`.
+
+## 2026-11-08 (e-mails)
+- Réglages SMTP lisibles aussi depuis `backend/.env` (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `SMTP_SENDER`), en secours de la clé Brevo ; envoi réel vérifié par l'API Brevo et par le SMTP Brevo. Doc : `comptes.md`.
 
 ## 2026-11-08 (forfaits en ligne)
 - Déployé sur le serveur de démo (migration `0020`) ; trois plans PayPal sandbox créés, un par forfait ; vérifié en ligne avec le compte démo : forfaits payables par PayPal, prix en crédits, motifs neutres, `/costs` refusé, Comfy Cloud en tête. Doc : `deploiement.md`.

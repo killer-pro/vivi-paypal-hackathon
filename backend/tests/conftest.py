@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 os.environ["DATABASE_URL"] = "postgresql+asyncpg://vv:vv@localhost:5432/video_virale_test"
 os.environ["FAKE_PROVIDERS"] = "true"
+for _key in ("BREVO_API_KEY", "SMTP_HOST"):  # jamais d'envoi réel depuis les tests, même si `.env` porte une clé
+    os.environ[_key] = ""
 
 from app.api.auth import make_session_cookie  # noqa: E402
 from app.app_settings import AppSettings  # noqa: E402

@@ -90,7 +90,11 @@ forfait (`credits`, remise à zéro du lot d'abonnement) et fixe `subscription_e
 
 Idempotence : un cycle payé = un événement `paypal:sub:<abonnement>:<mois payés>` dans `stripe_events`. La confirmation de l'écran et les
 webhooks `PAYMENT.SALE.COMPLETED` (renouvellement mensuel), `BILLING.SUBSCRIPTION.ACTIVATED`, `…CANCELLED` et `…EXPIRED` appellent le même
-code : un mois n'est jamais crédité deux fois, et le webhook active un client qui a fermé l'onglet. **Annulation** (`POST /api/billing/paypal/subscription/cancel`, ou événement) : plus de renouvellement, la période déjà payée reste
+code : un mois n'est jamais crédité deux fois, et le webhook active un client qui a fermé l'onglet. **Changement de forfait** : un abonné peut créer un abonnement à un autre forfait (le même forfait encore renouvelé : 409).
+L'abonnement en cours n'est touché qu'au premier mois payé du nouveau (confirmation ou webhook) : le nouveau devient
+`paypal_subscription_id`, l'ancien est annulé chez PayPal (en cas d'échec, erreur au journal : à annuler à la main), le
+quota d'abonnement est remis à celui du nouveau forfait et la période payée la plus longue est gardée. Un changement
+abandonné chez PayPal ne change rien. **Annulation** (`POST /api/billing/paypal/subscription/cancel`, ou événement) : plus de renouvellement, la période déjà payée reste
 acquise (`subscription_ends_at` et `plan_id` inchangés : les avantages courent jusqu'à la fin de la période, puis le compte
 repasse au niveau Gratuit) et l'abonnement est libéré. Limite connue : le reliquat de crédits d'abonnement d'un compte annulé n'expire
 qu'à une remise à zéro (pas de balayage à l'échéance). `GET /api/billing` expose, par forfait, `paypal_purchasable` (plan ET identifiants), le forfait courant

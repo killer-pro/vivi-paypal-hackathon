@@ -11,7 +11,7 @@ from app.app_settings import AppSettings
 from app.models import StripeEvent, User
 from app.services import credits
 from app.services.billing import load_billing
-from app.services.paypal_client import PayPalAPI
+from app.services.paypal_client import PayPalAPI, PayPalError
 
 logger = logging.getLogger("app.payments")
 
@@ -110,13 +110,16 @@ def cycles_completed(subscription: dict) -> int:
     return sum(int(run.get("cycles_completed") or 0) for run in runs if run.get("tenure_type") == "REGULAR")
 
 
-async def apply_paypal_subscription(session: AsyncSession, subscription: dict, app_settings: AppSettings) -> int:
+async def apply_paypal_subscription(session: AsyncSession, subscription: dict, app_settings: AppSettings,
+                                    paypal: PayPalAPI | None = None) -> int:
     """Aligne le compte sur un abonnement PayPal lu par l'API (jamais sur le corps d'un événement) ; renvoie les crédits
     accordés (0 : cycle déjà crédité, pas encore payé, ou abonnement terminé). Le `custom_id` (compte) est posé par nous à la
     création ; le plan PayPal désigne le forfait. Un plan qui n'est plus dans l'offre (abonnement d'avant les forfaits,
     plan recréé) garde le forfait du compte, ou le premier, si l'abonnement est déjà celui du compte ; sinon il est
     ignoré. Une annulation garde la période déjà payée (`subscription_ends_at`) et le forfait, qui ne compte plus une
-    fois la période finie ; elle libère seulement l'abonnement. Ne fait pas de `commit`."""
+    fois la période finie ; elle libère seulement l'abonnement. Changement de forfait : le premier mois payé d'un nouvel
+    abonnement le fait remplacer l'ancien, annulé chez PayPal par `paypal` (son quota est remplacé, la période payée la
+    plus longue est gardée). Ne fait pas de `commit`."""
     custom_id, config = str(subscription.get("custom_id") or ""), await load_billing(app_settings)
     user = await session.get(User, int(custom_id)) if custom_id.isdigit() else None
     status, cycles = subscription.get("status"), cycles_completed(subscription)
@@ -134,7 +137,13 @@ async def apply_paypal_subscription(session: AsyncSession, subscription: dict, a
         return 0
     if not await record_event(session, f"paypal:sub:{subscription['id']}:{cycles}", "subscription"):
         return 0
+    replaced = user.paypal_subscription_id if user.paypal_subscription_id != subscription["id"] else None
     user.paypal_subscription_id, user.plan_id = subscription["id"], offer.id
+    if replaced and paypal:
+        try:
+            await paypal.cancel_subscription(replaced, f"Remplacé par le forfait {offer.name}")
+        except PayPalError as e:  # l'ancien abonnement se renouvellerait : à annuler à la main chez PayPal
+            logger.error("Abonnement PayPal remplacé mais non annulé (%s) : %s", replaced, e)
     next_billing = (subscription.get("billing_info") or {}).get("next_billing_time")
     if next_billing:  # une lecture plus ancienne rejouée ne raccourcit jamais la période
         ends_at = datetime.fromisoformat(next_billing)
@@ -158,4 +167,4 @@ async def handle_paypal_event(session: AsyncSession, event: dict, paypal: PayPal
             return 0
     if not isinstance(subscription_id, str):
         return 0
-    return await apply_paypal_subscription(session, await paypal.get_subscription(subscription_id), app_settings)
+    return await apply_paypal_subscription(session, await paypal.get_subscription(subscription_id), app_settings, paypal)

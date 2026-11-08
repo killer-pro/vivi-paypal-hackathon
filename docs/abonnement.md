@@ -71,8 +71,9 @@ Le paiement (`docs/paiement.md`) écrit la date et le forfait. Pour des essais, 
 ## Interface
 - **Page Forfaits** (`/plans`, entrée « Forfaits » de la navigation pour tout compte ; `pages/Plans.tsx`,
   `components/BillingOffers.tsx`, logique `plans.ts`) : trois cartes côte à côte (nom, prix, crédits mensuels, bande de
-  cadres 9:16 « ≈ N vidéos de 30 s », avantages cochés, bouton « S'abonner avec PayPal » ou « Forfait actuel » /
-  « Annuler mon abonnement PayPal »), rappel du niveau « Sans abonnement », puis les recharges (« avantages du niveau
+  cadres 9:16 « ≈ N vidéos de 30 s », avantages cochés, bouton « S'abonner avec PayPal », « Passer à ce forfait » pour
+  un abonné, ou « Forfait actuel » / « Annuler mon abonnement PayPal » ; changement et annulation demandent une
+  confirmation), rappel du niveau « Sans abonnement », puis les recharges (« avantages du niveau
   gratuit »). Les retours de PayPal et Stripe arrivent sur `/plans`. L'écran Crédits renvoie vers cette page.
 - Fonctions verrouillées visibles, grisées, avec leur motif suivi de « Voir les forfaits » (`UpgradeNotice`) : cartes de
   profil, images de référence au-delà de la limite (`access.ts::referenceLimit`, remplacer une image reste permis),
@@ -81,5 +82,6 @@ Le paiement (`docs/paiement.md`) écrit la date et le forfait. Pour des essais, 
 - Les motifs serveur sont traduits par `admin/src/serverText.ts`.
 
 ## Limites connues
-- Pas de changement de forfait en cours de période : on annule, puis on s'abonne au nouveau à la fin de la période.
+- Changement de forfait immédiat, sans prorata : le mois en cours de l'ancien forfait n'est pas remboursé et ses crédits
+  d'abonnement restants sont remplacés par le quota du nouveau (`paiement.md`).
 - Un projet créé avec un style puis dont le propriétaire perd l'abonnement garde son style (seule la modification est refusée).

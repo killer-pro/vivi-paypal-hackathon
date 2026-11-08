@@ -180,21 +180,22 @@ class PayPalSubscriptionConfirmIn(BaseModel):
 async def paypal_subscription(body: PayPalSubscriptionIn, user: User = Depends(current_user),
                               session: AsyncSession = Depends(get_session), paypal: PayPalAPI = Depends(get_paypal)) -> dict:
     """Abonnement mensuel PayPal au forfait `tier_id` : renvoie l'`url` d'approbation. Rien n'est crédité ici : les
-    crédits arrivent à la confirmation (retour sur `/plans`) ou par le webhook, une fois le premier mois prélevé."""
+    crédits arrivent à la confirmation (retour sur `/plans`) ou par le webhook, une fois le premier mois prélevé. Un
+    abonné peut changer de forfait : le nouvel abonnement remplace l'ancien une fois son premier mois payé (voir
+    `payments.apply_paypal_subscription`) ; tant qu'il n'est pas approuvé, l'abonnement en cours ne change pas."""
     if user.email_verified_at is None:
         raise HTTPException(403, "Confirmez votre adresse e-mail avant d'acheter")
     plan = _tier_or_404(await load_billing(AppSettings(session)), body.tier_id)
     if not plan.paypal_subscribable:
         raise HTTPException(409, "Cette offre n'est pas disponible par PayPal")
-    _ensure_not_subscribed(user, "la page des forfaits")
+    if user.is_subscribed and user.paypal_subscription_id is not None and user.plan_id == plan.id:
+        raise HTTPException(409, "C'est déjà votre forfait")
     try:
-        subscription_id, url = await paypal.create_subscription(
+        _, url = await paypal.create_subscription(
             plan_id=plan.paypal_plan_id, custom_id=str(user.id), return_url=f"{settings.public_url}/plans?paypal_sub=success",
             cancel_url=f"{settings.public_url}/plans?paypal_sub=cancelled")
     except PayPalError as e:
         raise HTTPException(502, f"Abonnement indisponible : {e}") from e
-    user.paypal_subscription_id = subscription_id
-    await session.commit()
     return {"url": url}
 
 
@@ -211,7 +212,7 @@ async def paypal_subscription_confirm(body: PayPalSubscriptionConfirmIn, user: U
         raise HTTPException(502, f"Abonnement indisponible : {e}") from e
     if str(subscription.get("custom_id", "")) != str(user.id):
         raise HTTPException(403, "Cet abonnement n'appartient pas à ce compte")
-    added = await payments.apply_paypal_subscription(session, subscription, AppSettings(session))
+    added = await payments.apply_paypal_subscription(session, subscription, AppSettings(session), paypal)
     await session.commit()
     return {"activated": subscription.get("status") == "ACTIVE" and payments.cycles_completed(subscription) >= 1,
             "credited": added}

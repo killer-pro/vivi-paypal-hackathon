@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     langfuse_secret_key: str = ""
     langfuse_base_url: str = ""
     comfyui_url: str = "http://127.0.0.1:8188"
+    brevo_api_key: str = ""  # envoi des e-mails par l'API Brevo (prioritaire sur le SMTP)
+    brevo_sender: str = ""  # « Nom <adresse> », expéditeur validé dans Brevo
+    # Envoi par SMTP, à défaut de clé Brevo (port : 587 par défaut, voir `AppSettings`)
+    smtp_host: str = ""
+    smtp_port: str = ""
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_sender: str = ""
     fake_providers: bool = False
     # "dev" : poste local (avertissements, cookie sans Secure, /docs ouvert). Toute autre valeur (ex. "prod") : refus de
     # démarrer avec les secrets par défaut, cookie Secure, documentation de l'API fermée.
