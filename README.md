@@ -1,18 +1,26 @@
 # Vivi
 
 > **PayPal AI Hackathon submission.** Vivi is an AI tool that turns an idea into a finished vertical video
-> (script, clips, voice, music, edit). For this hackathon we added **PayPal checkout** (Orders v2: create, capture,
-> verified webhook) so users buy credits that pay for each AI generation. Everything runs locally with fake AI
-> providers and the **PayPal sandbox**, no paid API key needed.
+> (script, clips, voice, music, edit). For this hackathon we added **PayPal payments** so users pay for each AI
+> generation with credits: one-off **credit packs** (Orders v2: create, capture, verified webhook) and three monthly
+> **plans** (Starter, Créateur, Pro) billed with **PayPal Subscriptions**, each with its own credits and limits (queue,
+> references, video length, generation profiles). Everything runs locally with fake AI providers and the
+> **PayPal sandbox**, no paid API key needed. The interface switches between French and English.
 >
 > ### Try it in 5 minutes
 > 1. `npm install && npm run setup` then set `FAKE_PROVIDERS=true` in `backend/.env`.
 > 2. `npm run dev`, open http://localhost:5173, create an account (the verification link is printed in the API log).
 > 3. In **Settings**, enter your PayPal sandbox `Client ID` and `Secret` (https://developer.paypal.com, Apps & Credentials, Sandbox).
-> 4. Open **Credits**, click **Payer avec PayPal**, pay with a sandbox personal account: credits are added once.
+> 4. Open **Plans**, click **Pay with PayPal** on a credit pack and pay with a sandbox personal account: credits are added once.
+> 5. For subscriptions, create the sandbox plan of each tier once:
+>    `cd backend && uv run python scripts/paypal_create_plan.py --tier starter` (then `creator`, `pro`),
+>    and click **Subscribe with PayPal** on a plan.
 >
-> PayPal code: `backend/app/services/paypal_client.py`, `services/payments.py`, `api/billing_api.py`,
-> `api/paypal_webhook.py`, `admin/src/components/BillingOffers.tsx`. Details: `docs/paiement.md`.
+> PayPal code: `backend/app/services/paypal_client.py`, `services/payments.py`, `services/billing.py`,
+> `services/access.py`, `api/billing_api.py`, `api/paypal_webhook.py`, `admin/src/components/BillingOffers.tsx`.
+> Details: `docs/paiement.md`, `docs/abonnement.md`.
+>
+> License: [MIT](LICENSE).
 
 Workflow guidé de création de vidéos verticales (9:16) pour TikTok / Reels / Shorts : idée, script, image de référence
 (optionnelle), clips, voix off, musique, montage FFmpeg, titre / description / hashtags. Chaque étape se valide
@@ -94,3 +102,6 @@ Les clips peuvent être générés gratuitement par une instance ComfyUI locale 
    Maximum ≈ 18 min. La RAM libre compte autant que le profil (Maximum : 45 min avec le swap saturé). Les clips d'un
    projet sont générés un à la fois en local (avec fal.ai : jusqu'à 3 en parallèle). Catalogue et benchmark :
    `docs/profils-generation.md`.
+
+## Licence
+MIT, voir [`LICENSE`](LICENSE).
