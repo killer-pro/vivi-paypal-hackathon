@@ -1,11 +1,12 @@
 import asyncio
 import hashlib
-import re
+import math
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
 from app.providers.base import ProviderError
+from app.providers.elevenlabs import spoken
 
 WIDTH, HEIGHT, FPS = 1080, 1920, 30
 # Clips à cadence basse (Wan 2.2 14B : 16 fps) : images intermédiaires calculées par compensation de mouvement plutôt
@@ -13,7 +14,7 @@ WIDTH, HEIGHT, FPS = 1080, 1920, 30
 # Les sources à 24 fps et plus gardent la simple conversion de cadence.
 MIN_SMOOTH_FPS = 24
 MINTERPOLATE = f"minterpolate=fps={FPS}:mi_mode=mci:mc_mode=aobmc:me_mode=bidir:vsbmc=1"
-MUSIC_VOLUME = 0.15
+MUSIC_VOLUME = 0.15  # niveau par défaut de la musique sous la voix (réglable : paramètre `volume` de l'étape musique)
 LOUDNORM = "loudnorm=I=-16:TP=-1.5:LRA=11"  # son final normalisé (cible plateformes), voix + musique
 PAD_S = 0.3
 # Voix et clip de durées différentes : ils convergent vers le milieu. Voix plus longue : voix accélérée (hauteur
@@ -39,6 +40,7 @@ SUBTITLE_STYLES = {
     "bold": {"size": 84, "primary": "&H0000E6FF", "border": 1, "outline": 8, "outline_colour": "&H00000000"},
 }
 DEFAULT_SUBTITLE_STYLE = "classic"
+NO_SUBTITLES = "none"  # pas de sous-titres gravés (voix dont le texte diffère du script, vidéo sous-titrée ailleurs)
 
 
 def ass_header(style: str) -> str:
@@ -66,6 +68,7 @@ class SceneInput:
     clip: Path
     voice: Path
     text: str
+    synced: bool = False  # avatar parlant : la bouche suit la voix, ni l'un ni l'autre ne change de vitesse
 
 
 async def _run(*cmd: str, cwd: Path | None = None) -> str:
@@ -116,9 +119,13 @@ def _ts(seconds: float) -> str:
     return f"{cs // 360000}:{cs // 6000 % 60:02}:{cs // 100 % 60:02}.{cs % 100:02}"
 
 
+# Tirets typographiques (U+2010, U+2011 insécable) que les LLM écrivent : absents de la police, affichés en carré vide.
+FONT_SAFE = str.maketrans({"\u2010": "-", "\u2011": "-"})
+
+
 def _ass_text(text: str) -> str:
-    """Une ligne de texte brut : accolades (balises ASS) et antislashs (\\N, \\h…) neutralisés."""
-    clean = re.sub(r"\s+", " ", text).strip()
+    """Une ligne de texte brut : accolades (balises ASS) et antislashs (\\N, \\h…) neutralisés, tirets lisibles."""
+    clean = spoken(text).translate(FONT_SAFE)
     return clean.replace("\\", "/").replace("{", "(").replace("}", ")")
 
 
@@ -177,7 +184,7 @@ async def render_segment(scene: SceneInput, workdir: Path, name: str) -> Segment
     durée."""
     workdir.mkdir(parents=True, exist_ok=True)
     voice_s, clip_s = await probe_duration(scene.voice), await probe_duration(scene.clip)
-    duration, tempo, stretch = converge(voice_s, clip_s)
+    duration, tempo, stretch = (voice_s, 1.0, 1.0) if scene.synced else converge(voice_s, clip_s)
     d = duration + PAD_S
     v, a = workdir / f"{name}.mp4", workdir / f"{name}.wav"
     await _run("ffmpeg", "-y", "-loglevel", "error", "-i", str(scene.clip), "-t", f"{d:.3f}",
@@ -188,9 +195,20 @@ async def render_segment(scene: SceneInput, workdir: Path, name: str) -> Segment
     return Segment(v, a, d, scene.text)
 
 
+def music_level(percent) -> float:
+    """Niveau de la musique d'après le paramètre `volume` de l'étape musique (en %, borné à 0-100) ; absent ou illisible :
+    `MUSIC_VOLUME`."""
+    try:
+        value = float(percent)
+    except (TypeError, ValueError):
+        return MUSIC_VOLUME
+    return min(max(value, 0.0), 100.0) / 100 if math.isfinite(value) else MUSIC_VOLUME
+
+
 async def assemble(segments: list[Segment], music: Path | None, out: Path, workdir: Path,
-                   subtitle_style: str = DEFAULT_SUBTITLE_STYLE) -> float:
-    """Assemble les segments : sous-titres, voix, musique éventuelle, normalisation du son. Renvoie la durée totale."""
+                   subtitle_style: str = DEFAULT_SUBTITLE_STYLE, music_volume: float = MUSIC_VOLUME) -> float:
+    """Assemble les segments : sous-titres, voix, musique éventuelle (au niveau `music_volume`, 1 = volume d'origine),
+    normalisation du son. Renvoie la durée totale."""
     workdir.mkdir(parents=True, exist_ok=True)
     (workdir / "v.txt").write_text("".join(f"file '{s.video.resolve()}'\n" for s in segments), encoding="utf-8")
     (workdir / "a.txt").write_text("".join(f"file '{s.audio.resolve()}'\n" for s in segments), encoding="utf-8")
@@ -201,10 +219,10 @@ async def assemble(segments: list[Segment], music: Path | None, out: Path, workd
                "voice.wav", cwd=workdir)
     total = sum(s.duration for s in segments)
     inputs = ["-i", "video.mp4", "-i", "voice.wav"]
-    fc = "[0:v]subtitles=subs.ass[v];"
+    fc = "[0:v]null[v];" if subtitle_style == NO_SUBTITLES else "[0:v]subtitles=subs.ass[v];"
     if music:
         inputs += ["-stream_loop", "-1", "-i", str(music)]
-        fc += f"[2:a]volume={MUSIC_VOLUME}[m];[1:a][m]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[mix];[mix]{LOUDNORM}[a]"
+        fc += f"[2:a]volume={music_volume:.3f}[m];[1:a][m]amix=inputs=2:duration=first:dropout_transition=0:normalize=0[mix];[mix]{LOUDNORM}[a]"
     else:
         fc += f"[1:a]{LOUDNORM}[a]"
     await _run("ffmpeg", "-y", "-loglevel", "error", *inputs, "-filter_complex", fc, "-map", "[v]", "-map", "[a]",

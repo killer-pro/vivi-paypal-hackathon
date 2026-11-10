@@ -11,7 +11,7 @@ from app.providers.gemini import DEFAULT_MODEL as GEMINI_DEFAULT_MODEL
 from app.providers.groq import DEFAULT_MODEL as GROQ_DEFAULT_MODEL
 from app.providers.ollama import DEFAULT_MODEL as OLLAMA_DEFAULT_MODEL
 from app.providers.ollama import DEFAULT_URL as OLLAMA_DEFAULT_URL
-from app.providers.profiles import DEFAULT_PROFILE, LEGACY_NAMES
+from app.providers.profiles import DEFAULT_PROFILE, DEFAULT_TALK_MODEL, LEGACY_NAMES, TALK_MODELS
 from app.services.billing import DEFAULT_BILLING, parse_billing
 from app.services.pricing import DEFAULT_PRICING, parse_pricing, positive_decimal
 
@@ -22,16 +22,17 @@ SECRET_KEYS = {"anthropic_api_key", "gemini_api_key", "groq_api_key", "fal_key",
                 "stripe_secret_key", "stripe_webhook_secret", "paypal_client_secret"}
 EDITABLE_KEYS = SECRET_KEYS | {"comfyui_url", "default_voice_id", "voice_catalog", "default_video_provider", "default_video_model",
                                "llm_provider", "gemini_model", "groq_model", "ollama_url", "ollama_model", "project_budget_usd", "image_provider",
-                               "start_image_provider", "gemini_image_model", "langfuse_public_key", "langfuse_base_url",
+                               "start_image_provider", "lipsync_model", "gemini_image_model", "langfuse_public_key", "langfuse_base_url",
                                "smtp_host", "smtp_port", "smtp_user", "smtp_sender", "brevo_sender", "paypal_client_id", "paypal_webhook_id", "paypal_mode",
                                *CREDIT_KEYS}
 # Choix par défaut que l'éditeur affiche (voix, modèles) : lisibles par tout compte, aucun secret ni adresse de service.
 EDITOR_KEYS = {"default_voice_id", "voice_catalog", "default_video_provider", "default_video_model", "image_provider",
-               "start_image_provider"}
+               "start_image_provider", "lipsync_model"}
 DEFAULTS = {"default_voice_id": "", "voice_catalog": "[]", "default_video_provider": "comfyui", "default_video_model": DEFAULT_PROFILE,
             "llm_provider": "claude", "gemini_model": GEMINI_DEFAULT_MODEL, "groq_model": GROQ_DEFAULT_MODEL,
             "ollama_url": OLLAMA_DEFAULT_URL, "ollama_model": OLLAMA_DEFAULT_MODEL, "project_budget_usd": "10",
-            "image_provider": "gemini", "start_image_provider": "comfyui", "gemini_image_model": GEMINI_DEFAULT_IMAGE_MODEL,
+            "image_provider": "gemini", "start_image_provider": "comfyui", "lipsync_model": DEFAULT_TALK_MODEL,
+            "gemini_image_model": GEMINI_DEFAULT_IMAGE_MODEL,
             "smtp_port": "587", "credits_usd_per_credit": "0.01", "credits_margin": "3", "credits_signup_grant": "200",
             "credits_reservation_timeout_min": "30", "credits_pricing": DEFAULT_PRICING,
             "billing_config": DEFAULT_BILLING, "paypal_mode": "sandbox"}
@@ -39,7 +40,8 @@ LLM_PROVIDERS = ("claude", "gemini", "groq", "ollama")
 START_IMAGE_PROVIDERS = ("comfyui", "gemini")  # image de départ de chaque scène : Flux Kontext (local) ou Gemini
 IMAGE_PROVIDERS = ("gemini", "fal", "comfyui", "comfycloud")  # image de référence ; Gemini par défaut (même clé que la rédaction)
 # Réglages à valeurs fermées : une autre valeur est refusée à l'écriture.
-CHOICES = {"paypal_mode": ("sandbox", "live"), "llm_provider": LLM_PROVIDERS, "image_provider": IMAGE_PROVIDERS, "start_image_provider": START_IMAGE_PROVIDERS}
+CHOICES = {"paypal_mode": ("sandbox", "live"), "llm_provider": LLM_PROVIDERS, "image_provider": IMAGE_PROVIDERS, "start_image_provider": START_IMAGE_PROVIDERS,
+           "lipsync_model": tuple(TALK_MODELS)}
 # Réglages au format contraint (vide = retour au défaut) : un identifiant de modèle finit dans une URL.
 PATTERNS = {**{key: re.compile(r"[A-Za-z0-9._-]+") for key in ("gemini_model", "gemini_image_model", "ollama_model")},
             "groq_model": re.compile(r"[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)?")}  # Groq préfixe l'éditeur : « openai/gpt-oss-120b »

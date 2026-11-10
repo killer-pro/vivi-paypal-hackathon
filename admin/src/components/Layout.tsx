@@ -91,37 +91,11 @@ export default function Layout() {
           </div>
         </aside>
         <main className="main">
-          {!me.email_verified && <VerifyBanner />}
           <RouteErrorBoundary>
             <Outlet />
           </RouteErrorBoundary>
         </main>
       </div>
     </MeContext>
-  );
-}
-
-/** Rappel discret tant que l'adresse n'est pas confirmée, avec renvoi du lien. */
-function VerifyBanner() {
-  const [state, setState] = useState<{ busy?: boolean; message?: string; error?: boolean }>({});
-
-  async function resend() {
-    setState({ busy: true });
-    try {
-      await api("/auth/resend", { method: "POST" });
-      setState({ message: t("Lien envoyé : consultez votre boîte de réception.") });
-    } catch (err) {
-      setState({ message: errorMessage(err), error: true });
-    }
-  }
-
-  return (
-    <div className="verify-banner" role="status">
-      <span>{t("Confirmez votre adresse e-mail")}</span>
-      {state.message && <span className={state.error ? "error" : "muted"}>{state.message}</span>}
-      <button className="btn btn-small btn-ghost" onClick={resend} disabled={state.busy}>
-        {t("Renvoyer le lien")}
-      </button>
-    </div>
   );
 }

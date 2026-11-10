@@ -20,9 +20,11 @@ L'état d'abonnement d'un compte (`subscription_ends_at`) et les fonctions qu'il
 ## Parcours
 1. **Inscription** (`/register`) : crée le compte (rôle `user`, non vérifié) et envoie un lien de vérification. Réponse
    identique que l'adresse soit libre ou déjà prise (pas d'énumération).
-2. **Vérification** (`/verify?token=`) : marque l'adresse vérifiée et **révoque les sessions ouvertes** : se reconnecter.
-3. **Connexion** (`/login`) : un compte non vérifié peut se connecter (bandeau « Confirmez votre adresse e-mail » et
-   renvoi du lien) ; les crédits d'inscription ne sont accordés qu'à la vérification (`docs/credits.md`).
+2. **Vérification** (`/verify?token=`) : marque l'adresse vérifiée, **révoque les sessions ouvertes** et connecte le
+   titulaire du lien, qui arrive directement dans l'app.
+3. **Connexion** (`/login`) : réservée aux adresses confirmées. Mot de passe juste mais adresse non confirmée : `403` et
+   bouton « Renvoyer le lien » (avec l'e-mail et le mot de passe saisis) ; les crédits d'inscription ne sont accordés
+   qu'à la vérification (`docs/credits.md`).
 4. **Mot de passe oublié** (`/forgot` puis `/reset?token=`) : change le mot de passe, **vérifie aussi l'adresse** (le
    lien prouve l'accès à la boîte) et révoque les sessions.
 
@@ -87,23 +89,21 @@ Le vrai envoi SMTP ne journalise jamais le corps.
 
 | Route | Écran | Appel |
 |---|---|---|
-| `/login` | e-mail + mot de passe ; liens « Créer un compte », « Mot de passe oublié » | `POST /auth/login` puis `/` |
+| `/login` | e-mail + mot de passe ; liens « Créer un compte », « Mot de passe oublié » ; « Renvoyer le lien » après un `403` | `POST /auth/login` puis `/` ; `POST /auth/resend` |
 | `/register` | e-mail + mot de passe (8 à 128 caractères, `validPassword`) | `POST /auth/register` |
-| `/verify?token=` | confirme l'adresse au montage (un seul appel, même en StrictMode) | `POST /auth/verify` |
+| `/verify?token=` | confirme l'adresse au montage (un seul appel, même en StrictMode), puis ouvre l'app (`/new` si une idée attend) | `POST /auth/verify` |
 | `/forgot` | e-mail | `POST /auth/forgot` |
 | `/reset?token=` | nouveau mot de passe | `POST /auth/reset` |
 
 - Messages neutres : l'inscription affiche toujours « Si cette adresse est valide, un lien de confirmation vient d'être
   envoyé », le mot de passe oublié « Si un compte existe pour cette adresse, un lien de réinitialisation vient d'être
   envoyé » : la réponse ne révèle pas les comptes existants.
-- `/verify` et `/reset` révoquent les sessions ouvertes : après succès, l'écran propose « Se connecter ». Jeton absent ou
-  refusé : « Lien invalide ou expiré ».
+- `/reset` révoque les sessions ouvertes : après succès, l'écran propose « Se connecter ». `/verify` connecte et ouvre
+  l'app. Jeton absent ou refusé : « Lien invalide ou expiré ».
 - Un `401` ne renvoie vers `/login` que hors de ces écrans (`isPublicPath`, utilisé par `api`).
 
 ## Écrans connectés
 - `Layout` lit `GET /auth/me` et fournit le compte par `MeContext` (`hooks/useMe.ts`).
 - Navigation filtrée par rôle (`visibleNav`) : « Musique » et « Réglages » sont `adminOnly`. Dans l'éditeur, le bouton
   d'import de piste (panneau Musique) n'est montré qu'à l'administrateur (`POST /music` lui est réservé).
-- Adresse non confirmée : bandeau « Confirmez votre adresse e-mail » en tête de page avec « Renvoyer le lien »
-  (`POST /auth/resend`).
 - Coûts : un filtre `project_id` d'un projet inconnu ou d'un autre compte (404) est retiré de l'URL.

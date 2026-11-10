@@ -8,11 +8,13 @@ from sqlalchemy import case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import current_user
+from app.api.music import MAX_UPLOAD_BYTES as MAX_AUDIO_UPLOAD_BYTES
+from app.api.music import measure_duration
 from app.app_settings import AppSettings
 from app.db import get_session
 from app.models import Asset, AssetOriginal, CreditReservation, Project, ProviderCall, Scene, Step, User
 from app.providers.registry import ProviderRegistry
-from app.services import access
+from app.services import access, lipsync
 from app.services.budget import estimate_clips_usd, spent_by_step
 from app.services.flow import (
     current_step,
@@ -27,15 +29,17 @@ from app.services.flow import (
 from app.services.queue_runs import queued_runs
 from app.services.styles import STYLES
 from app.state import STEP_NAMES
+from app.state import dependents as state_dependents
 from app.storage import get_storage
-from app.uploads import VIDEO, Upload, UploadKind, download_extension, read_upload
+from app.uploads import AUDIO, VIDEO, Upload, UploadKind, download_extension, read_upload
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
-PROJECT_FIELDS = ("id", "title", "theme", "platform", "target_duration_s", "style", "status", "metadata_json", "autopilot",
-                  "created_at")
+PROJECT_FIELDS = ("id", "title", "theme", "platform", "target_duration_s", "style", "lipsync", "status", "metadata_json",
+                  "autopilot", "created_at")
 STEP_FIELDS = ("name", "status", "params", "result", "error")
-SCENE_FIELDS = ("id", "position", "voice_text", "visual_prompt", "duration_s", "selected_clip_asset_id", "reference", "elements", "continuity")
+SCENE_FIELDS = ("id", "position", "voice_text", "visual_prompt", "duration_s", "selected_clip_asset_id", "reference", "elements", "continuity",
+                "lipsync")
 ASSET_FIELDS = ("id", "scene_id", "kind", "key", "content_type", "variant", "meta", "created_at")
 BRIEF_FIELDS = {"theme", "platform", "target_duration_s", "style"}  # lus dès l'idée ; le titre ne sert qu'au rendu final
 
@@ -151,6 +155,7 @@ class ProjectIn(BaseModel):
     platform: str = Field("tiktok", max_length=30)
     target_duration_s: int = Field(30, gt=0, le=MAX_TARGET_DURATION_S)
     style: str = Field("", max_length=30)
+    lipsync: bool = False
 
     _known_style = field_validator("style")(known_style)
 
@@ -161,6 +166,7 @@ class ProjectPatch(BaseModel):
     platform: str | None = Field(None, max_length=30)
     target_duration_s: int | None = Field(None, gt=0, le=MAX_TARGET_DURATION_S)
     style: str | None = Field(None, max_length=30)
+    lipsync: bool | None = None
 
     _known_style = field_validator("style")(known_style)
 
@@ -249,18 +255,22 @@ async def get_project(project_id: int, user: User = Depends(current_user), sessi
                       for s in steps],
             "queue": [{"id": q.id, "step": q.step, "scene_id": q.scene_id}
                       for q in await queued_runs(session, project_id)],
-            "scenes": [fields(s, SCENE_FIELDS) for s in scenes],
+            # `on_screen` : le personnage qui parle est visible (la scène peut alors être générée en lip-sync).
+            "scenes": [{**fields(s, SCENE_FIELDS), "on_screen": lipsync.on_screen(s)} for s in scenes],
             "assets": [asset_out(a, storage, originals.get(a.id), admin=user.is_admin) for a in assets]}
 
 
 @router.patch("/{project_id}")
 async def edit_project(project_id: int, body: ProjectPatch, session: AsyncSession = Depends(get_session)) -> dict:
     """Modifie le brief. Les étapes produites qui en dépendent passent en `stale` : toutes si thème, plateforme ou
-    durée changent, seulement `final` si seul le titre change. 409 si l'une de ces étapes tourne."""
+    durée changent, les clips et la suite si l'avatar parlant change, seulement `final` si seul le titre change. 409 si
+    l'une de ces étapes tourne."""
     project = await project_or_404(session, project_id)
     changed = {k for k, v in body.model_dump(exclude_unset=True).items() if v is not None and getattr(project, k) != v}
     if changed:
-        steps, dependents = await load_steps(session, [project_id]), STEP_NAMES if changed & BRIEF_FIELDS else ["final"]
+        dependents = (STEP_NAMES if changed & BRIEF_FIELDS else ["clips", *state_dependents("clips")]
+                      if "lipsync" in changed else ["final"])
+        steps = await load_steps(session, [project_id])
         ensure_not_running(steps, dependents)
         mark_stale(steps, dependents)
         await sync_status(session, project_id, steps)
@@ -287,7 +297,8 @@ async def download_asset(project_id: int, asset_id: int, session: AsyncSession =
     asset = await session.get(Asset, asset_id)
     if asset is None or asset.project_id != project_id:
         raise HTTPException(404, "Fichier introuvable")
-    name = f"vivi-{project_id}.{download_extension(asset.content_type)}"
+    ref = (asset.meta or {}).get("ref") if asset.kind == "reference" else None  # image d'un élément : son nom et sa version
+    name = f"vivi-{project_id}{f'-{ref}-{asset.id}' if ref else ''}.{download_extension(asset.content_type)}"
     return RedirectResponse(storage.presign(asset.key, download=name))
 
 
@@ -356,13 +367,19 @@ async def store_upload(session: AsyncSession, storage, upload: Upload, *, projec
 
 
 @router.post("/{project_id}/scenes/{scene_id}/upload-clip", status_code=201)
-async def upload_clip(project_id: int, scene_id: int, file: UploadFile = File(...),
+async def upload_clip(project_id: int, scene_id: int, file: UploadFile = File(...), retouches: int | None = Form(None),
                       session: AsyncSession = Depends(get_session), storage=Depends(get_storage)) -> dict:
-    """Upload d'une vidéo locale comme variante de clip pour la scène."""
+    """Upload d'une vidéo locale comme variante de clip pour la scène. `retouches` : id du clip lip-sync de la scène dont
+    la vidéo est une retouche à la même durée (écran incrusté, plan de coupe…) ; elle garde sa voix (`voice_asset_id`),
+    montée sans changement de vitesse pour que les lèvres restent calées."""
     await project_or_404(session, project_id)
     scene = await session.get(Scene, scene_id)
     if scene is None or scene.project_id != project_id:
         raise HTTPException(404, "Scène introuvable")
+    source = await session.get(Asset, retouches) if retouches is not None else None
+    if retouches is not None and (source is None or source.scene_id != scene_id or source.kind != "clip"
+                                  or not source.meta.get("voice_asset_id")):
+        raise HTTPException(422, "Le clip retouché doit être un clip lip-sync de cette scène")
 
     steps = await load_steps(session, [project_id])
     ensure_not_running(steps, ("clips", "montage"))
@@ -372,12 +389,38 @@ async def upload_clip(project_id: int, scene_id: int, file: UploadFile = File(..
         Asset.project_id == project_id, Asset.kind == "clip", Asset.scene_id == scene_id))
     asset = await store_upload(session, storage, upload, project_id=project_id, scene_id=scene_id, kind="clip",
                                variant=(last or 0) + 1)
+    if source is not None:
+        asset.meta = {**asset.meta, "retouches": source.id, "voice_asset_id": source.meta["voice_asset_id"],
+                      "lipsync": source.meta.get("lipsync")}
 
     if scene.selected_clip_asset_id is None:
         scene.selected_clip_asset_id = asset.id
         mark_stale(steps, CLIP_CHOICE_DEPENDENTS)
         await sync_status(session, project_id, steps)
 
+    await session.commit()
+    await session.refresh(asset)
+    return asset_out(asset, storage, upload.original_name)
+
+
+@router.post("/{project_id}/scenes/{scene_id}/upload-voice", status_code=201)
+async def upload_voice(project_id: int, scene_id: int, file: UploadFile = File(...),
+                       session: AsyncSession = Depends(get_session), storage=Depends(get_storage)) -> dict:
+    """Voix enregistrée importée pour la scène (langue que la synthèse ne parle pas, voix réelle) : devient la voix de la
+    scène, gardée par « Générer les voix » et prononcée par l'avatar parlant au prochain clip de la scène. Le montage
+    et le rendu final sont à refaire."""
+    await project_or_404(session, project_id)
+    scene = await session.get(Scene, scene_id)
+    if scene is None or scene.project_id != project_id:
+        raise HTTPException(404, "Scène introuvable")
+    steps = await load_steps(session, [project_id])
+    ensure_not_running(steps, ("clips", "voice", "montage"))
+    upload = await read_upload(file, AUDIO, MAX_AUDIO_UPLOAD_BYTES)
+    await measure_duration(upload.data)  # 400 si illisible : le montage échouerait plus tard
+    asset = await store_upload(session, storage, upload, project_id=project_id, scene_id=scene_id, kind="voice")
+    asset.meta = {**asset.meta, "imported": True, "text": scene.voice_text}
+    mark_stale(steps, state_dependents("voice"))
+    await sync_status(session, project_id, steps)
     await session.commit()
     await session.refresh(asset)
     return asset_out(asset, storage, upload.original_name)
@@ -403,9 +446,30 @@ async def upload_reference(project_id: int, file: UploadFile = File(...), ref: s
     ensure_not_running(steps, ("reference",))
 
     upload = await read_upload(file, IMAGE, MAX_IMAGE_UPLOAD_BYTES)
+    return await save_reference(session, storage, project_id, steps, upload, {"ref": ref} if ref else {})
+
+
+@router.post("/{project_id}/reference/{asset_id}/restore", status_code=201)
+async def restore_reference(project_id: int, asset_id: int, session: AsyncSession = Depends(get_session),
+                            storage=Depends(get_storage)) -> dict:
+    """Reprend une version précédente de l'image d'un élément (galerie des versions) : copiée comme dernière version,
+    celle que les clips lisent ; la version remplacée reste dans la galerie. Mêmes règles que l'import."""
+    await project_or_404(session, project_id)
+    source = await session.get(Asset, asset_id)
+    if source is None or source.project_id != project_id or source.kind != "reference":
+        raise HTTPException(404, "Image de référence introuvable")
+    steps = await load_steps(session, [project_id])
+    ensure_not_running(steps, ("reference",))
+    upload = Upload(await storage.get(source.key), download_extension(source.content_type), source.content_type, None)
+    meta = {k: v for k, v in source.meta.items() if k in ("ref", "model")}
+    return await save_reference(session, storage, project_id, steps, upload, {**meta, "restored_from": source.id})
+
+
+async def save_reference(session: AsyncSession, storage, project_id: int, steps: list[Step], upload: Upload,
+                         meta: dict) -> dict:
+    """Nouvelle version de l'image de référence (la dernière d'un élément est celle des clips) ; étape reference validée."""
     asset = await store_upload(session, storage, upload, project_id=project_id, kind="reference", variant=1)
-    if ref:
-        asset.meta = {**asset.meta, "ref": ref}
+    asset.meta = {**asset.meta, **meta}
     for s in steps:
         if s.name == "reference":
             s.status = "approved"
@@ -445,7 +509,8 @@ async def estimate(project_id: int, provider: str = "", model: str = "", user: U
     except KeyError:
         raise HTTPException(400, f"Provider vidéo inconnu : {provider}") from None
     try:
-        cost = await estimate_clips_usd(session, registry, project_id, provider, model)
+        cost = await estimate_clips_usd(session, registry, project_id, provider, model,
+                                        await app_settings.get("lipsync_model"))
     except KeyError:
         raise HTTPException(400, f"Modèle vidéo inconnu pour {provider} : {model}") from None
     scene_count = await session.scalar(select(func.count()).select_from(Scene).where(Scene.project_id == project_id))

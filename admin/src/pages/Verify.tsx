@@ -1,32 +1,32 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { api, errorMessage } from "../api";
 import { tokenFromSearch } from "../auth";
+import { pendingIdea } from "../pendingIdea";
 import { AuthCard, AuthMessage } from "../components/AuthCard";
 import { t } from "../i18n";
 
-type State = { ok: boolean; message: string } | null;
-
-/** Confirme l'adresse au montage avec le jeton du lien reçu. La vérification révoque les sessions ouvertes : on
- *  renvoie vers la connexion. */
+/** Confirme l'adresse au montage avec le jeton du lien reçu. L'API connecte alors le titulaire du lien : on l'emmène dans
+ *  l'app (ou vers l'idée qui attend sa vidéo). */
 export default function Verify() {
   const token = tokenFromSearch(useLocation().search);
-  const [state, setState] = useState<State>(token ? null : { ok: false, message: t("Lien invalide ou expiré") });
+  const [error, setError] = useState<string | null>(token ? null : t("Lien invalide ou expiré"));
   const sent = useRef(false); // jeton à usage unique : un seul appel, même si l'effet est rejoué (StrictMode)
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!token || sent.current) return;
     sent.current = true;
     api("/auth/verify", { method: "POST", body: JSON.stringify({ token }) }).then(
-      () => setState({ ok: true, message: t("Adresse e-mail confirmée. Connectez-vous pour continuer.") }),
-      (err) => setState({ ok: false, message: errorMessage(err) }),
+      () => navigate(pendingIdea() ? "/new" : "/", { replace: true }),
+      (err) => setError(errorMessage(err)),
     );
-  }, [token]);
+  }, [token, navigate]);
 
   return (
-    <AuthCard title={t("Confirmation de l'adresse")} links={state ? [{ to: "/login", label: t("Se connecter") }] : []}>
-      {state ? (
-        <AuthMessage error={!state.ok}>{state.message}</AuthMessage>
+    <AuthCard title={t("Confirmation de l'adresse")} links={error ? [{ to: "/login", label: t("Se connecter") }] : []}>
+      {error ? (
+        <AuthMessage error>{error}</AuthMessage>
       ) : (
         <p className="login-message muted">{t("Vérification du lien…")}</p>
       )}

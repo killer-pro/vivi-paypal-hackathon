@@ -21,3 +21,5 @@ Kevin MacLeod et les ajoute via `POST /api/music` (donc dans MinIO). Seules les 
 ignorée). Le nom de chaque piste porte son crédit (`Titre — Kevin MacLeod (CC BY 4.0)`) : en CC BY 4.0, ce crédit doit
 figurer dans la description de la vidéo publiée (« Music: <titre> by Kevin MacLeod, CC BY 4.0 »).
 L'autopilot choisit la première piste de la bibliothèque (plus petit id).
+
+Volume de la musique sous la voix : curseur du panneau Musique de l'éditeur, paramètre `volume` de l'étape (voir `montage.md`).

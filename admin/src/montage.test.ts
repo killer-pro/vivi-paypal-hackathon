@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { converge, PAD_S, sceneTiming } from "./montage";
+import { converge, DEFAULT_MUSIC_VOLUME, musicVolume, PAD_S, sceneTiming } from "./montage";
 
 // Mêmes cas que `test_converge_meets_in_the_middle_within_the_natural_limits` (backend/tests/test_montage.py).
 describe("converge", () => {
@@ -29,5 +29,25 @@ describe("sceneTiming", () => {
   it("tant qu'une durée manque, la durée du script et des vitesses normales", () => {
     expect(sceneTiming(undefined, 3.3, 3)).toEqual({ duration: 3, tempo: 1, rate: 1 });
     expect(sceneTiming(4, undefined, 3)).toEqual({ duration: 3, tempo: 1, rate: 1 });
+  });
+});
+
+// Mêmes cas que `test_music_level_reads_the_volume_percent_of_the_music_step` (backend/tests/test_montage.py).
+describe("musicVolume", () => {
+  it.each([
+    [undefined, DEFAULT_MUSIC_VOLUME],
+    [null, DEFAULT_MUSIC_VOLUME],
+    [40, 40],
+    ["25", 25],
+    [0, 0],
+    [250, 100],
+    [-5, 0],
+    ["fort", DEFAULT_MUSIC_VOLUME],
+  ])("volume %s → %s %%", (volume, expected) => {
+    expect(musicVolume({ volume })).toBe(expected);
+  });
+
+  it("vaut le défaut sans paramètres", () => {
+    expect(musicVolume(undefined)).toBe(DEFAULT_MUSIC_VOLUME);
   });
 });

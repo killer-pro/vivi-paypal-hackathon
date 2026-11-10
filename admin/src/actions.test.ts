@@ -51,6 +51,9 @@ describe("availableActions", () => {
       stale: true,
     });
   });
+  it("montage périmé : à relancer, jamais validé tel quel (ce serait l'ancienne vidéo)", () => {
+    expect(availableActions(step("stale", "montage"), true)).toMatchObject({ stale: true, canRun: true, canApprove: false });
+  });
   it("approved : régénérable, pas de nouvelle validation", () => {
     expect(availableActions(step("approved"), true)).toMatchObject({ canRun: true, canApprove: false });
   });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { referenceElements, referenceImage, scenesUsing, storyElementsWithoutReference, type Asset } from "./api";
+import { referenceElements, referenceImage, referenceVersions, scenesUsing, storyElementsWithoutReference, type Asset } from "./api";
 import type { Step } from "./steps";
 import { chainBlockedReason, toggled } from "./studio";
 
@@ -22,6 +22,7 @@ describe("éléments de référence", () => {
     expect(referenceImage(assets, "fries")?.id).toBe(4);
     expect(referenceImage(assets, "")?.id).toBe(1);
     expect(referenceImage(assets, "ghost")).toBeUndefined();
+    expect(referenceVersions(assets, "kroc").map((a) => a.id)).toEqual([2, 3]);
   });
 });
 

@@ -129,6 +129,10 @@ export interface Scene {
   elements: { id: string; state: string }[];
   /** `continue` : le clip part de la dernière image du clip de la scène précédente ; `cut` : de l'image de référence. */
   continuity: "cut" | "continue";
+  /** Avatar parlant : `false` = clip animé ordinaire, voix hors champ, même si le personnage qui parle est visible. */
+  lipsync: boolean;
+  /** Le personnage qui dit la voix off est visible dans la scène (elle peut alors être générée en lip-sync). */
+  on_screen: boolean;
 }
 
 export interface Asset {
@@ -159,6 +163,8 @@ export interface ProjectDetail extends Project {
   target_duration_s: number;
   /** Style visuel (`""` : aucun). */
   style: string;
+  /** Avatar parlant : les scènes où parle un personnage visible sont générées en lip-sync, sur sa voix. */
+  lipsync: boolean;
   metadata_json: Record<string, unknown>;
   /** Dépenses par étape (assistant IA sous `assist`), seules celles qui ont coûté : justifie `cost_usd`. */
   cost_by_step: Record<string, number> | null;
@@ -178,7 +184,7 @@ export interface StyleOption {
   label: string;
 }
 
-export type ProjectPatch = Partial<ProjectIn>;
+export type ProjectPatch = Partial<ProjectIn & Pick<ProjectDetail, "lipsync">>;
 
 /** Corps de `PATCH /projects/{id}/steps/{name}`. */
 export interface StepPatch {
@@ -253,9 +259,14 @@ export function scenesUsing(scenes: Pick<Scene, "position" | "reference" | "elem
   return scenes.filter((s) => s.reference === ref || s.elements.some((e) => e.id === ref)).map((s) => s.position);
 }
 
-/** Dernière image de référence de l'élément `ref` (`""` : image du projet entier, sans élément). */
+/** Images de référence de l'élément `ref`, de la plus ancienne à la dernière (`""` : image du projet entier, sans élément). */
+export function referenceVersions(assets: Asset[], ref: string): Asset[] {
+  return assets.filter((a) => a.kind === "reference" && ((a.meta.ref as string | undefined) ?? "") === ref);
+}
+
+/** Dernière image de référence de l'élément `ref` : celle que les clips reprennent. */
 export function referenceImage(assets: Asset[], ref: string): Asset | undefined {
-  return assets.findLast((a) => a.kind === "reference" && ((a.meta.ref as string | undefined) ?? "") === ref);
+  return referenceVersions(assets, ref).at(-1);
 }
 
 /** Dernier asset produit d'un type (pour une scène donnée, ou hors scène). */

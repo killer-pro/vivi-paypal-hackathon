@@ -4,16 +4,18 @@ import httpx
 
 from app.providers.base import (
     Availability,
+    GenerationResult,
     ProviderError,
     ensure_non_empty,
     key_is_valid,
     missing_key,
     raise_for_provider,
     require_key,
+    split_prompt,
 )
-from app.providers.comfyui import ComfyUIImage, ComfyUIProvider, execution_error, first_output
-from app.providers.profiles import ModelFile, get_profile
-from app.providers.workflows import cloud_workflow
+from app.providers.comfyui import ComfyUIImage, ComfyUIProvider, _seed, execution_error, first_output
+from app.providers.profiles import DEFAULT_PROFILE, TALK_MODELS, ModelFile, get_profile
+from app.providers.workflows import cloud_workflow, talk_workflow
 
 BASE_URL = "https://cloud.comfy.org/api"
 KEY_MISSING = missing_key("Comfy Cloud", "Comfy Cloud")
@@ -26,6 +28,9 @@ USD_PER_GPU_S = 736 / 3600 / 211
 # Image de départ Kontext comprise : elle s'exécute dans le même graphe que le clip (Rapide avec référence : ≈ 0,021 $).
 GPU_S_PER_CLIP = {"fast": 22, "balanced": 26, "precision": 45, "max": 60}
 ESTIMATE_CLIP_S = 3
+# Image de départ d'un avatar parlant (Flux Kontext avec la référence du personnage, Flux dev sans) : ≈ la différence
+# mesurée entre les profils Précision et Rapide.
+TALK_KEYFRAME_GPU_S = 20
 # Pire cas : file d'attente du service et profil Maximum de 5 s (quelques minutes de calcul) ; le polling le couvre.
 CLIP_TIMEOUT_S = 1200
 IMAGE_TIMEOUT_S = 600
@@ -38,6 +43,12 @@ def cloud_clip_usd(profile: str, duration_s: float) -> float:
     """Coût de revient d'un clip Comfy Cloud : temps de GPU mesuré du profil, proportionnel à la durée (référence 3 s)."""
     seconds = GPU_S_PER_CLIP[get_profile(profile).id] * max(duration_s, 1) / ESTIMATE_CLIP_S
     return round(seconds * USD_PER_GPU_S, 4)
+
+def cloud_talk_usd(model: str, duration_s: float) -> float:
+    """Coût de revient d'un avatar parlant : image de départ, puis secondes de GPU par seconde de voix du modèle."""
+    seconds = TALK_KEYFRAME_GPU_S + TALK_MODELS[model].gpu_s_per_s * max(duration_s, 1)
+    return round(seconds * USD_PER_GPU_S, 4)
+
 
 class ComfyCloudProvider(ComfyUIProvider):
     """Mêmes profils et mêmes graphes que ComfyUI local, exécutés par Comfy Cloud (API v1, celle de ComfyUI plus le statut
@@ -64,6 +75,21 @@ class ComfyCloudProvider(ComfyUIProvider):
         output = first_output(await self._wait_or_cancel(prompt_id))
         self._spent += await self._gpu_seconds(prompt_id) * USD_PER_GPU_S
         return ensure_non_empty(await self._view({k: output.get(k, "") for k in ("filename", "subfolder", "type")}), what)
+
+    async def talk(self, prompt: str, *, model: str, audio: bytes, duration_s: float, image: bytes | None = None,
+                   references=(), start_image: bytes | None = None) -> GenerationResult:
+        """Avatar parlant : image de départ composée comme pour un clip (`start_image` telle quelle, sinon Kontext avec
+        la référence du personnage, sinon Flux dev), puis vidéo où sa bouche suit `audio` (voix de `duration_s`
+        secondes). Fichiers envoyés sous des noms uniques : plusieurs scènes peuvent tourner en même temps."""
+        if model not in TALK_MODELS:
+            raise ProviderError(f"{self.name}: modèle lip-sync inconnu : {model}")
+        still, motion = split_prompt(prompt)
+        keyframe = start_image or await self._keyframe(get_profile(DEFAULT_PROFILE), still, image, list(references))
+        seed = _seed()
+        image_name = await self._upload(keyframe, f"vv_talk_{seed}.png")
+        audio_name = await self._upload(audio, f"vv_talk_{seed}.mp3", "audio/mpeg")
+        data = await self._run(talk_workflow(model, motion or still, seed, duration_s, image_name, audio_name), "avatar parlant")
+        return GenerationResult(data, "video/mp4", self._take_spent(), model, keyframe)
 
     async def _gpu_seconds(self, prompt_id: str) -> float:
         """Durée d'exécution facturée (horodatages en millisecondes) ; 0 si le service ne la donne pas."""

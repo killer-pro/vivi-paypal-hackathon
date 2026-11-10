@@ -1,7 +1,7 @@
 import "./Pills.css";
 
 /** Choix exclusif en pastilles (boutons radio). */
-export default function Pills<T extends string | number | null>({
+export default function Pills<T extends string | number | boolean | null>({
   legend,
   name,
   options,

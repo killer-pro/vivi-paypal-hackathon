@@ -3,7 +3,7 @@ import { api, errorMessage, useApi, type ProviderModels } from "../api";
 import ModelCards from "../components/ModelCards";
 import VoiceCatalog from "../components/VoiceCatalog";
 import { ErrorState, Field } from "../components/ui";
-import { IMAGE_PROVIDER_LABELS, pickable, START_IMAGE_LABELS } from "../models";
+import { IMAGE_PROVIDER_LABELS, LIPSYNC_MODEL_LABELS, pickable, START_IMAGE_LABELS } from "../models";
 import { parseVoices, SECRET_KEYS, settingsBody, voiceLabel, withCurrent, type Settings } from "../settings";
 import "./Providers.css";
 import { t } from "../i18n";
@@ -289,6 +289,7 @@ function SettingsForm({
           </div>
           <div className="form-row">
             {select("start_image_provider", t("Image de départ des scènes (avancé)"), Object.keys(START_IMAGE_LABELS), START_IMAGE_LABELS)}
+            {select("lipsync_model", t("Avatar parlant (lip-sync, Comfy Cloud)"), Object.keys(LIPSYNC_MODEL_LABELS), LIPSYNC_MODEL_LABELS)}
           </div>
           <p className="muted">
             {t("Quand une scène a des images de référence, ce générateur les replace dans la scène avant l'animation (ComfyUI et Comfy Cloud seulement). Modifiable à chaque lancement des clips, dans Avancé.")}

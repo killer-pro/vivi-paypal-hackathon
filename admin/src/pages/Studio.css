@@ -1197,6 +1197,30 @@
   max-width: none;
 }
 
+/* Volume de la musique sous la voix : libellé, curseur, valeur ; la note passe dessous. */
+.music-volume {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 4ch;
+  align-items: center;
+  gap: 6px 12px;
+  margin-bottom: 12px;
+}
+
+.music-volume input {
+  accent-color: var(--track-music);
+}
+
+.music-volume output {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.music-volume .muted {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+}
+
 /* Aperçu 9:16 */
 .preview {
   grid-area: preview;
@@ -1768,7 +1792,7 @@
 /* Style des sous-titres du montage : chaque tuile imite le rendu (fond de scène sombre, texte en bas). */
 .subtitle-styles {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
   margin: 0;
   padding: 0;
@@ -1846,4 +1870,38 @@
 .subtitle-name {
   font-size: 13px;
   text-align: center;
+}
+
+/* Versions de l'image d'un élément : vignettes 9:16, la dernière (celle des clips) cerclée de l'accent */
+.reference-versions {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin: 4px 0 0;
+  padding: 0 0 4px;
+  list-style: none;
+}
+
+.reference-versions li {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  flex: 0 0 76px;
+  font-size: 12px;
+}
+
+.reference-versions img {
+  width: 76px;
+  border-radius: var(--radius-s);
+  outline: 1px solid var(--line-strong);
+}
+
+.reference-versions .is-current img {
+  outline: 2px solid var(--accent);
+}
+
+.reference-versions .btn {
+  width: 100%;
+  justify-content: center;
+  padding-inline: 4px;
 }

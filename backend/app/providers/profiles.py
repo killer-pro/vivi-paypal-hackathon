@@ -37,6 +37,26 @@ DEFAULT_PROFILE = "fast"
 LEGACY_NAMES = {"workflow": "max"}  # ancien nom du modèle ComfyUI unique
 
 
+@dataclass(frozen=True)
+class TalkModel:
+    """Modèle d'avatar parlant (lip-sync) : une image et une voix donnent une vidéo où la bouche suit la voix, exécuté sur
+    Comfy Cloud. `fps` : cadence de sortie du graphe, d'où son nombre d'images."""
+
+    id: str
+    name: str
+    description: str
+    fps: int
+    gpu_s_per_s: float  # secondes de GPU par seconde de voix, mesurées le 2026-11-09 (voix de 4 et 8 s)
+
+
+TALK_MODELS = {m.id: m for m in (
+    TalkModel("s2v", "Wan 2.2 S2V", "Le plus rapide et le moins cher, bouche bien articulée.", 16, 6.5),
+    TalkModel("infinitetalk", "InfiniteTalk", "Expressions les plus vivantes, deux fois plus cher.", 25, 13.5),
+    TalkModel("ltx", "LTX-2.3", "Image la plus nette (704×1280), bouche moins marquée.", 24, 9),
+)}
+DEFAULT_TALK_MODEL = "s2v"
+
+
 def get_profile(model: str) -> Profile:
     model = LEGACY_NAMES.get(model, model)
     for profile in PROFILES:

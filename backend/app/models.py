@@ -74,6 +74,8 @@ class Project(Base):
     platform: Mapped[str] = mapped_column(String(30), default="tiktok")
     target_duration_s: Mapped[int] = mapped_column(Integer, default=30)
     style: Mapped[str] = mapped_column(String(30), default="", server_default="")
+    # Avatar parlant : les scènes où parle un personnage visible sont générées en lip-sync (voir `services/lipsync.py`).
+    lipsync: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     status: Mapped[str] = mapped_column(String(30), default="draft")
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -149,6 +151,8 @@ class Scene(Base):
     continuity: Mapped[str] = mapped_column(String(10), default="cut", server_default="cut")
     # id du personnage qui prononce la voix off de la scène ("" : le narrateur, voix par défaut)
     speaker: Mapped[str] = mapped_column(String(30), default="", server_default="")
+    # Avatar parlant : `False` = clip animé ordinaire même si le personnage qui parle est visible (voix hors champ).
+    lipsync: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
     elements: Mapped[list] = mapped_column(JSON, default=list, server_default="[]")  # [{"id", "state"}] visibles dans la scène
 
 

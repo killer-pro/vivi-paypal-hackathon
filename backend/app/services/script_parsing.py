@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from app.providers.base import ProviderError
+from app.providers.elevenlabs import spoken
 from app.services.llm_json import (
     fill_durations,
     json_value,
@@ -145,7 +146,7 @@ def script_problems(scenes: list[dict], target_duration_s: float, noun: str = "s
     if abs(total - target_duration_s) > DURATION_TOLERANCE * target_duration_s:
         problems.append(f"la somme des duration_s vaut {total:g} s au lieu de {target_duration_s:g} s")
     for i, s in enumerate(scenes, 1):
-        words, budget = len(s["voice_text"].split()), word_budget(s["duration_s"])
+        words, budget = len(spoken(s["voice_text"]).split()), word_budget(s["duration_s"])
         if words > budget * WORDS_TOLERANCE + 3:
             problems.append(f"{noun} {i} : {words} mots de voix off pour {s['duration_s']:g} s (maximum {budget})")
     if not has_engagement(scenes[-1]["voice_text"]):

@@ -24,7 +24,9 @@ image (Flux Kontext replace l'élément dans la scène, puis Wan 2.2 I2V l'anime
 - `POST /projects/{id}/reference/upload` (multipart) : champ `ref` facultatif, pour importer l'image d'un élément. Autorisé
   pendant les clips (le job a lu ses images au lancement ; la nouvelle sert aux clips suivants), 409 pendant l'étape
   reference.
-- `POST /projects/{id}/references` `{name, prompt, story_id?}` : ajoute (avec `story_id`, un élément de l'histoire sans image — accessoire au-delà du plafond, lieu — est promu en référence : il garde son id et son descripteur, 422 s'il n'existe pas dans l'histoire) un élément aux `references` du script (id tiré du nom, sans
+- `POST /projects/{id}/reference/{asset_id}/restore` : reprend une version précédente de l'image d'un élément. Elle est copiée
+  comme dernière version (celle que les clips lisent) ; rien n'est supprimé. Mêmes règles que l'import.
+- `POST /projects/{id}/references` `{name, prompt?, story_id?}` (`prompt` vide : le nom sert de prompt, pour un élément ajouté avec une image importée) : ajoute (avec `story_id`, un élément de l'histoire sans image — accessoire au-delà du plafond, lieu — est promu en référence : il garde son id et son descripteur, 422 s'il n'existe pas dans l'histoire) un élément aux `references` du script (id tiré du nom, sans
   accents). 201 `{id, prompt}` ; 409 si le script tourne ou n'existe pas, si l'id existe ou si `MAX_REFERENCES_TOTAL` (12, contre 6 générés d'office par l'IA) est atteint ;
   422 si le nom est inexploitable. Rien n'est périmé ; un nouveau script remplace la liste.
 - `POST …/steps/reference/run` : `reference_id` (422 sur une autre étape) et `params` (prompts, générateur) appliqués au démarrage ; un élément seul demandé pendant que l'étape tourne est mis en file (`file-attente.md`), l'étape entière reste un 409.
@@ -36,8 +38,9 @@ Les images sont toujours visibles en tête des onglets Script et Clips de la pag
 (`CastStrip` sur `castOf` : vignette 9:16, type, nombre de scènes, « Générer » / « Réessayer » d'un seul élément) ; chaque ligne
 de la liste des scènes porte les pastilles de ses éléments (avec leur état) et un trait d'accent relie les scènes enchaînées.
 Clips → « Image de référence » (replié : il ne sert qu'à modifier) : une carte par élément (nom, scènes qui l'utilisent, prompt modifiable, Importer, Générer / Régénérer) et
-« Générer toutes les images » ; « + élément de l'histoire » promeut en référence un élément de l'histoire qui n'en a pas (prompt de son image, à défaut sa description) ; « Ajouter un élément » (nom + description) crée un personnage ou un objet en plus de
-ceux du script, puis on l'attribue aux scènes ; sous chaque scène, une seule liste « Images envoyées avec le clip » (case + miniature + nom par élément, 2 images au plus ; en cocher une de plus retire la plus ancienne). La première cochée est l'image principale (`reference` de la scène) ; toutes les cochées sont envoyées comme `elements` (la principale y reste, comme à l'écriture du script : son état est conservé et sa pastille reste affichée). Un accessoire coché en image secondaire compte aussitôt la scène dans le casting. Générer une référence périme les étapes
+« Générer toutes les images » ; « + élément de l'histoire » promeut en référence un élément de l'histoire qui n'en a pas (prompt de son image, à défaut sa description) ; « Ajouter un élément » (nom + description, ou nom + « Importer une image », description alors facultative) crée un personnage ou un objet en plus de
+ceux du script, puis on l'attribue aux scènes ; sous chaque carte, dès qu'un élément a deux images, ses **versions** (de la dernière à la plus ancienne) :
+« Actuelle » cerclée, « Utiliser » sur les autres (restauration, utile après une régénération par erreur), « Télécharger » sur chacune ; sous chaque scène, une seule liste « Images envoyées avec le clip » (case + miniature + nom par élément, 2 images au plus ; en cocher une de plus retire la plus ancienne). La première cochée est l'image principale (`reference` de la scène) ; toutes les cochées sont envoyées comme `elements` (la principale y reste, comme à l'écriture du script : son état est conservé et sa pastille reste affichée). Un accessoire coché en image secondaire compte aussitôt la scène dans le casting. Générer une référence périme les étapes
 aval (clips, voix, montage), comme tout changement d'une étape amont.
 
 ## Limites

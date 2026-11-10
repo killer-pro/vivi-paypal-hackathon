@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { runningDownstream } from "../../steps";
 import { QUEUE_HINT, QUEUE_LABEL } from "../../studio";
 import { referenceElementsOf, referenceLimit, type Access } from "../../access";
 import UpgradeNotice from "../UpgradeNotice";
-import { referenceElements, referenceImage, useApi, storyElementsWithoutReference, type ProviderModels, type ReferenceElement, type Step } from "../../api";
+import { referenceElements, referenceImage, referenceVersions, useApi, storyElementsWithoutReference, type Asset, type ProviderModels, type ReferenceElement, type Step } from "../../api";
 import type { CastMember } from "../../casting";
 import { choiceKey, choiceOf, imageBlocked, imageChoice, imageOptions, type Choice } from "../../models";
 import type { PanelProps } from "../StepPanel";
@@ -23,9 +23,40 @@ interface Props extends Pick<PanelProps, "flow" | "project" | "locked" | "runLoc
   imageDefault: string;
 }
 
-/** Édition d'un élément récurrent du script (personnage, produit) : son prompt, régénération et import ; son image est
- *  dans le bandeau du casting. */
-function ElementCard({ member, prompt, onPrompt, noGenerate, noUpload, queueing, onGenerate, onUpload }: {
+/** Versions de l'image d'un élément, de la dernière à la plus ancienne : la dernière est celle des clips ; une autre
+ *  redevient la dernière avec « Utiliser » (la remplacée reste ici). Chacune se télécharge. */
+function Versions({ projectId, versions, noRestore, onRestore }: {
+  projectId: number;
+  versions: Asset[];
+  noRestore: boolean;
+  onRestore: (assetId: number) => void;
+}) {
+  if (versions.length < 2) return null;
+  const current = versions.at(-1)?.id;
+  return (
+    <ul className="reference-versions" aria-label={t("Versions de l'image")}>
+      {[...versions].reverse().map((v) => (
+        <li key={v.id} className={v.id === current ? "is-current" : undefined}>
+          <img className="frame-9x16" src={v.url} alt="" />
+          {v.id === current ? (
+            <span className="muted">{t("Actuelle")}</span>
+          ) : (
+            <button className="btn btn-small" disabled={noRestore} onClick={() => onRestore(v.id)} title={t("Les prochains clips partiront de cette image")}>
+              {t("Utiliser")}
+            </button>
+          )}
+          <a className="btn btn-small btn-ghost" href={`/api/projects/${projectId}/assets/${v.id}/download`} title={t("Enregistrer cette image sur l'ordinateur")}>
+            {t("Télécharger")}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Édition d'un élément récurrent du script (personnage, produit) : son prompt, régénération, import et versions de son
+ *  image ; l'image actuelle est dans le bandeau du casting. */
+function ElementCard({ member, prompt, onPrompt, noGenerate, noUpload, queueing, onGenerate, onUpload, versions }: {
   member: CastMember;
   prompt: string;
   onPrompt: (value: string) => void;
@@ -37,6 +68,8 @@ function ElementCard({ member, prompt, onPrompt, noGenerate, noUpload, queueing,
   queueing: boolean;
   onGenerate: () => void;
   onUpload: (file: File) => void;
+  /** Galerie des versions de l'image (`Versions`). */
+  versions: ReactNode;
 }) {
   const { name, scenes } = member;
   return (
@@ -53,6 +86,7 @@ function ElementCard({ member, prompt, onPrompt, noGenerate, noUpload, queueing,
           {queueing ? QUEUE_LABEL : member.imageUrl ? t("Régénérer") : "Générer"}
         </button>
       </div>
+      {versions}
     </div>
   );
 }
@@ -60,11 +94,16 @@ function ElementCard({ member, prompt, onPrompt, noGenerate, noUpload, queueing,
 /** Éléments au plus (miroir de `MAX_REFERENCES_TOTAL` côté API). */
 const MAX_REFERENCE_ELEMENTS = 12;
 
-/** Formulaire d'ajout d'un élément que le script n'a pas listé (autre personnage, objet) : nom + description de l'image. */
-function AddElement({ onAdd }: { onAdd: (name: string, prompt: string) => Promise<boolean> }) {
+/** Formulaire d'ajout d'un élément que le script n'a pas listé (autre personnage, objet) : nom, et description de l'image
+ *  à générer ou image importée (la description devient alors facultative). */
+function AddElement({ onAdd, onAddImage }: {
+  onAdd: (name: string, prompt: string) => Promise<boolean>;
+  onAddImage: (name: string, prompt: string, file: File) => Promise<boolean>;
+}) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [file, setFile] = useState<File | null>(null);
   if (!open) {
     return (
       <div>
@@ -75,9 +114,10 @@ function AddElement({ onAdd }: { onAdd: (name: string, prompt: string) => Promis
     );
   }
   const submit = async () => {
-    if (!(await onAdd(name.trim(), prompt.trim()))) return;
+    if (!(await (file ? onAddImage(name.trim(), prompt.trim(), file) : onAdd(name.trim(), prompt.trim())))) return;
     setName("");
     setPrompt("");
+    setFile(null);
     setOpen(false);
   };
   return (
@@ -85,14 +125,18 @@ function AddElement({ onAdd }: { onAdd: (name: string, prompt: string) => Promis
       <Field label={t("Nom de l'élément")}>
         <input className="input" placeholder={t("Ex. : Ouvrier de l'Égypte ancienne")} maxLength={60} value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
-      <Field label={t("Description de l'image")}>
+      <Field label={file ? t("Description de l'image (facultative)") : t("Description de l'image")}>
         <TextArea className="input" rows={3} placeholder={t("Ex. : Un ouvrier égyptien au torse nu, pagne de lin, peau hâlée, portant un bloc de pierre")} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
       </Field>
       <div className="form-actions">
+        <label className="btn btn-small" title={t("Utiliser une image de l'ordinateur au lieu de la générer")}>
+          {file ? t("Image : {name}", { name: file.name }) : t("Importer une image")}
+          <input type="file" accept="image/*" hidden onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+        </label>
         <button className="btn btn-ghost btn-small" onClick={() => setOpen(false)}>
           {t("Annuler")}
         </button>
-        <button className="btn btn-small" onClick={submit} disabled={!name.trim() || !prompt.trim()}>
+        <button className="btn btn-small" onClick={submit} disabled={!name.trim() || !(prompt.trim() || file)}>
           {t("Ajouter")}
         </button>
       </div>
@@ -180,6 +224,14 @@ export default function ReferenceSection({ flow, project, locked, runLocked, ref
                         )
                       }
                       onUpload={(file) => flow.uploadReference(file, e.id)}
+                      versions={
+                        <Versions
+                          projectId={project.id}
+                          versions={referenceVersions(project.assets, e.id)}
+                          noRestore={flow.busy || refStep.status === "running"}
+                          onRestore={flow.restoreReference}
+                        />
+                      }
                     />
                   )
                 );
@@ -215,7 +267,7 @@ export default function ReferenceSection({ flow, project, locked, runLocked, ref
             </div>
           </div>
         )}
-        {elements.length < MAX_REFERENCE_ELEMENTS && <AddElement onAdd={flow.addReference} />}
+        {elements.length < MAX_REFERENCE_ELEMENTS && <AddElement onAdd={flow.addReference} onAddImage={flow.addReferenceImage} />}
 
         <Field label={t("Générateur d'image")}>
           <select className="input" value={choiceKey(choice)} onChange={(e) => setPick(choiceOf(e.target.value))}>

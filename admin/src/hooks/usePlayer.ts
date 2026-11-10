@@ -2,8 +2,6 @@ import { useEffect, useEffectEvent, useRef, useState } from "react";
 import type { SceneTiming } from "../montage";
 import { sceneAt, type Block } from "../studio";
 
-/** Niveau de la musique sous la voix, le même que dans le rendu (`MUSIC_VOLUME`, `backend/app/services/montage.py`). */
-const MUSIC_PREVIEW_VOLUME = 0.15;
 /** Écart minimal entre deux mises à jour du temps affiché (l'horloge tourne à chaque image). */
 const TIME_STEP_S = 0.05;
 /** Reprise d'une scène terminée : à moins de cet écart de sa fin, `play` la rejoue depuis le début. */
@@ -17,6 +15,8 @@ interface PlayerSource {
   voice?: string;
   /** Musique de fond choisie : joue en continu sur la timeline, sous les scènes (le rendu la contient déjà). */
   music?: string;
+  /** Niveau de la musique sous la voix (0 à 1), le même que dans le rendu. */
+  musicVolume: number;
   blocks: Block[];
   /** Calage de chaque scène (durée, vitesse de la voix et du clip), comme le montage ; un par bloc. */
   timings: SceneTiming[];
@@ -31,7 +31,7 @@ interface PlayerSource {
  * vitesses du montage (voix accélérée ou ralentie, clip étiré), la scène suivante démarre quand sa durée est écoulée,
  * jamais avant la fin de la voix, et l'horloge attend un média qui charge encore.
  */
-export function usePlayer({ render, clip, voice, music, blocks, timings, total, index, setIndex }: PlayerSource) {
+export function usePlayer({ render, clip, voice, music, musicVolume, blocks, timings, total, index, setIndex }: PlayerSource) {
   const video = useRef<HTMLVideoElement>(null);
   const audio = useRef<HTMLAudioElement>(null);
   const musicAudio = useRef<HTMLAudioElement>(null);
@@ -97,8 +97,8 @@ export function usePlayer({ render, clip, voice, music, blocks, timings, total, 
   };
 
   useEffect(() => {
-    if (musicAudio.current) musicAudio.current.volume = MUSIC_PREVIEW_VOLUME;
-  }, [music]);
+    if (musicAudio.current) musicAudio.current.volume = musicVolume;
+  }, [music, musicVolume, render]); // l'élément audio n'existe que sans rendu
 
   const resumeAfterSourceChange = useEffectEvent(() => {
     if (!resume.current) return;

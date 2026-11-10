@@ -33,10 +33,13 @@ FILM) n'est installé dans ComfyUI, d'où ce choix côté FFmpeg.
 - Style : Arial gras 64 px, blanc avec contour noir de 4 px, centré en bas (`Alignment=2`), `MarginV=420` px (tiers
   inférieur, au-dessus des boutons et légendes des plateformes), marges latérales 80 px ; retour à la ligne automatique.
 - Texte : retours ligne et espaces multiples réduits à un espace ; `{`/`}` remplacés par des parenthèses et `\` par `/`
-  (pas de balise ASS injectée par le texte de la voix off).
+  (pas de balise ASS injectée par le texte de la voix off). Les tirets U+2010 et U+2011 (insécable, que les LLM
+  écrivent dans « micro‑objectif ») deviennent `-` : la police ne les a pas et les affichait en carré vide (`FONT_SAFE`).
 
 ## Musique
-Optionnelle, bouclée, volume `MUSIC_VOLUME = 0.15`, mixée sous la voix (`amix`, durée = celle de la voix, `normalize=0` : la voix garde son niveau d'origine au lieu d'être divisée par le nombre d'entrées, soit -6 dB). Sans musique, seule la voix est conservée.
+Optionnelle, bouclée, mixée sous la voix (`amix`, durée = celle de la voix, `normalize=0` : la voix garde son niveau d'origine au lieu d'être divisée par le nombre d'entrées, soit -6 dB). Sans musique, seule la voix est conservée.
+
+Volume réglable : paramètre `volume` de l'étape `music` (en %, 0 à 100 ; absent ou illisible : `MUSIC_VOLUME = 0.15`, soit 15 %), lu par `music_level` et passé à `assemble(..., music_volume=...)`. Il se règle avec le curseur « Volume sous la voix » du panneau Musique de l'éditeur (affiché quand une piste est choisie), enregistré au relâchement : comme tout changement de l'étape musique, le montage devient à refaire. L'aperçu sans rendu joue la musique à ce niveau (`musicVolume`, `admin/src/montage.ts`). Les segments en cache ne dépendent pas du volume : seul l'assemblage est refait.
 
 ## Loudness
 En fin de chaîne audio (voix seule ou voix + musique), `LOUDNORM = loudnorm=I=-16:TP=-1.5:LRA=11` normalise le son final (-16 LUFS intégrés, crête -1,5 dB) pour un niveau homogène d'une vidéo à l'autre.
@@ -47,4 +50,4 @@ FFmpeg et ffprobe doivent être dans le `PATH`, FFmpeg compilé avec libass (fil
 Limite : une musique plus courte que la vidéo est bouclée ; le fichier musique n'est jamais supprimé de MinIO, même si la piste est retirée de la bibliothèque.
 
 ## Style des sous-titres
-Paramètre `subtitle_style` de l'étape `montage` : `classic` (blanc, contour noir, 64 px, défaut), `box` (blanc sur boîte sombre semi-opaque) ou `bold` (jaune, 84 px, gros contour). Une valeur inconnue retombe sur `classic`. Les segments en cache ne dépendent pas du style (seul l'assemblage final grave les sous-titres) : changer de style ne ré-encode aucune scène. Choix dans le panneau Montage de l'éditeur.
+Paramètre `subtitle_style` de l'étape `montage` : `classic` (blanc, contour noir, 64 px, défaut), `box` (blanc sur boîte sombre semi-opaque) ou `bold` (jaune, 84 px, gros contour). `none` (« Sans ») : aucun sous-titre gravé (voix enregistrées dont le texte diffère du script, vidéo sous-titrée ailleurs) ; l'aperçu de l'éditeur n'affiche alors pas non plus le texte sur les clips. Une valeur inconnue retombe sur `classic`. Les segments en cache ne dépendent pas du style (seul l'assemblage final grave les sous-titres) : changer de style ne ré-encode aucune scène. Choix dans le panneau Montage de l'éditeur.

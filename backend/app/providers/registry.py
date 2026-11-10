@@ -4,7 +4,7 @@ from app.app_settings import IMAGE_PROVIDERS, LLM_PROVIDERS, AppSettings
 from app.config import settings
 from app.providers.base import ImageProvider, LLMProvider, ProviderError, VideoProvider, VoiceProvider
 from app.providers.claude import ClaudeLLM
-from app.providers.comfycloud import ComfyCloudImage, ComfyCloudProvider, cloud_clip_usd
+from app.providers.comfycloud import ComfyCloudImage, ComfyCloudProvider, cloud_clip_usd, cloud_talk_usd
 from app.providers.comfyui import ComfyUIImage, ComfyUIProvider
 from app.providers.elevenlabs import ElevenLabsVoice
 from app.providers.fakes import FakeImage, FakeLLM, FakeVideo, FakeVoice
@@ -12,6 +12,7 @@ from app.providers.fal import IMAGE_MODELS, FalProvider
 from app.providers.gemini import GeminiImage, GeminiLLM, image_models
 from app.providers.groq import GroqLLM
 from app.providers.ollama import OllamaLLM
+from app.providers.profiles import TALK_MODELS
 from app.services import langfuse
 
 # Providers qui exécutent nos graphes ComfyUI : mêmes profils Wan 2.2, image de départ par Flux Kontext, image de
@@ -89,6 +90,12 @@ class ProviderRegistry:
         if name == "comfycloud":
             return ComfyCloudProvider(await self._s.get("comfy_cloud_api_key"), self._client)
         return ComfyUIProvider(await self._s.get("comfyui_url"), self._client)
+
+    async def talker(self) -> ComfyCloudProvider | FakeVideo:
+        """Générateur des avatars parlants (lip-sync) : Comfy Cloud seulement (modèles absents du ComfyUI local)."""
+        if settings.fake_providers:
+            return FakeVideo(models=list(TALK_MODELS), cost=cloud_talk_usd)
+        return ComfyCloudProvider(await self._s.get("comfy_cloud_api_key"), self._client)
 
     async def voice(self) -> VoiceProvider:
         if settings.fake_providers:

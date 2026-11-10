@@ -88,7 +88,10 @@ export default function VoicePanel(props: PanelProps) {
           />
         )}
         {voice ? (
-          <AudioPlayer src={voice.url} label={t("Voix de la scène {n}", { n: scene.position })} />
+          <>
+            <AudioPlayer src={voice.url} label={t("Voix de la scène {n}", { n: scene.position })} />
+            {voice.meta.imported === true && <p className="muted">{t("Voix importée : gardée quand toutes les voix sont générées.")}</p>}
+          </>
         ) : (
           <p className="empty-line">{t("Pas encore de voix pour cette scène.")}</p>
         )}
@@ -111,6 +114,20 @@ export default function VoicePanel(props: PanelProps) {
             >
               {step.status === "running" ? QUEUE_LABEL : priceLabel(voice ? t("Régénérer cette voix") : t("Générer cette voix"), scenePrice)}
             </button>
+            <label className="btn" aria-disabled={locked} title={t("Utiliser un enregistrement de l'ordinateur au lieu de la voix de synthèse")}>
+              {voice?.meta.imported === true ? t("Remplacer la voix importée") : t("Importer une voix")}
+              <input
+                type="file"
+                accept="audio/*"
+                hidden
+                disabled={locked}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = ""; // le même fichier peut être réimporté
+                  if (file) flow.uploadVoice(scene.id, file);
+                }}
+              />
+            </label>
             <PriceNote quote={scenePrice} />
           </div>
         )}

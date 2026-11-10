@@ -4,13 +4,17 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.app_settings import AppSettings
-from app.models import ProviderCall, Scene
-from app.providers.profiles import get_profile
+from app.models import Project, ProviderCall, Scene
+from app.providers.comfycloud import cloud_talk_usd
+from app.providers.profiles import DEFAULT_TALK_MODEL, get_profile
 from app.providers.registry import ProviderRegistry
+from app.services import lipsync
 from app.services.pricing import Pricing
 
 # Étapes qui appellent un provider payant. Montage et musique sont gratuits : un projet qui a atteint son budget peut
 # toujours les terminer.
+# Voix ElevenLabs d'une scène d'avatar parlant, produite par l'étape clips (≈ 0,011 $ mesurés par scène).
+TALK_VOICE_USD = 0.012
 PAID_STEPS = {"idea", "story", "script", "reference", "clips", "voice", "final"}
 
 
@@ -38,27 +42,34 @@ async def spent_by_step(session: AsyncSession, project_id: int) -> dict[str, flo
 
 async def clip_scene_costs_usd(session: AsyncSession, registry: ProviderRegistry, project_id: int, provider: str,
                                model: str, scene_id: int | None = None, skip_scene_ids: frozenset[int] = frozenset(),
-                               image_per_scene_usd: float = 0.0, pricing: Pricing | None = None) -> dict[int, float]:
+                               image_per_scene_usd: float = 0.0, pricing: Pricing | None = None,
+                               talk_model: str = DEFAULT_TALK_MODEL) -> dict[int, float]:
     """Coût de revient de chaque scène à générer {scène: dollars} (une seule scène, ou toutes sauf `skip_scene_ids`,
     déjà produites en cas de reprise). `image_per_scene_usd` : image de départ payante de chaque scène (Gemini).
     `pricing` : pour ComfyUI, coût du forfait local du profil (ComfyUI ne coûte rien en dollars : sans `pricing`, 0).
+    Une scène d'avatar parlant (`lipsync.talks`) coûte le modèle lip-sync `talk_model` sur Comfy Cloud et sa voix.
     `KeyError` : provider ou modèle inconnu."""
     video = await registry.video(provider)
-    query = select(Scene.id, Scene.duration_s).where(Scene.project_id == project_id, Scene.id.not_in(skip_scene_ids))
+    project = await session.get(Project, project_id)
+    query = select(Scene).where(Scene.project_id == project_id, Scene.id.not_in(skip_scene_ids))
     if scene_id is not None:
         query = query.where(Scene.id == scene_id)
     local = pricing is not None and provider == "comfyui"
-    return {sid: (pricing.local_clip_cost_usd(get_profile(model).id, duration) if local and pricing
-                  else video.estimate_cost(model, duration)) + image_per_scene_usd
-            for sid, duration in (await session.execute(query)).all()}
+
+    def cost(scene: Scene) -> float:
+        if project is not None and lipsync.talks(project, scene):
+            return cloud_talk_usd(talk_model, scene.duration_s) + TALK_VOICE_USD + image_per_scene_usd
+        return (pricing.local_clip_cost_usd(get_profile(model).id, scene.duration_s) if local and pricing
+                else video.estimate_cost(model, scene.duration_s)) + image_per_scene_usd
+
+    return {scene.id: cost(scene) for scene in (await session.scalars(query)).all()}
 
 
 async def estimate_clips_usd(session: AsyncSession, registry: ProviderRegistry, project_id: int, provider: str,
-                             model: str, scene_id: int | None = None, skip_scene_ids: frozenset[int] = frozenset(),
-                             image_per_scene_usd: float = 0.0) -> float:
+                             model: str, talk_model: str = DEFAULT_TALK_MODEL) -> float:
     """Coût estimé en dollars de la génération des clips (budget en dollars des projets de l'admin)."""
-    return sum((await clip_scene_costs_usd(session, registry, project_id, provider, model, scene_id, skip_scene_ids,
-                                           image_per_scene_usd)).values())
+    return sum((await clip_scene_costs_usd(session, registry, project_id, provider, model,
+                                           talk_model=talk_model)).values())
 
 
 async def ensure_within_budget(session: AsyncSession, project_id: int, app_settings: AppSettings,

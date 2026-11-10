@@ -194,10 +194,10 @@ class ComfyUIProvider:
         with contextlib.suppress(Exception):
             await self._post("free", json={"unload_models": True, "free_memory": True}, timeout=AVAILABILITY_TIMEOUT_S)
 
-    async def _upload(self, png: bytes, name: str = KEYFRAME_UPLOAD_NAME) -> str:
-        """Dépose une image dans `input/` de ComfyUI (à la place de la précédente du même nom) ; renvoie le nom à donner
-        à `LoadImage`."""
-        files = {"image": (name, png, "image/png")}
+    async def _upload(self, data: bytes, name: str = KEYFRAME_UPLOAD_NAME, mime: str = "image/png") -> str:
+        """Dépose un fichier (image, ou voix pour `LoadAudio`) dans `input/` de ComfyUI (à la place du précédent du même
+        nom) ; renvoie le nom à donner au nœud qui le lit."""
+        files = {"image": (name, data, mime)}
         r = await self._post("upload/image", files=files, data={"overwrite": "true"})
         raise_for_provider(r, self.name)
         body = r.json()

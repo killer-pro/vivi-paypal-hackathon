@@ -110,7 +110,7 @@ async def test_unconfigured_subscription_is_refused_with_a_clear_message(api_as,
 
 async def test_unverified_account_cannot_buy(api_as, make_user, stripe):
     r = await (await api_as(await make_user("a@x.fr", verified=False))).post("/api/billing/checkout", json={"kind": "topup", "pack_id": "pack200"})
-    assert r.status_code == 403 and "adresse e-mail" in r.json()["detail"]
+    assert r.status_code == 401  # aucune session tant que l'adresse n'est pas confirmée
 
 
 async def test_active_subscriber_is_sent_to_the_portal_not_a_second_checkout(api_as, make_user, stripe, session):

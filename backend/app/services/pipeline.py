@@ -14,8 +14,9 @@ from app.app_settings import VOICE_ID, AppSettings, parse_voice_catalog
 from app.models import Asset, MusicTrack, Project, Scene, Step
 from app.providers.base import GenerationResult, ProviderError, TextResult, split_prompt
 from app.providers.comfyui import KONTEXT_PREFIX
+from app.providers.elevenlabs import spoken
 from app.providers.registry import ProviderRegistry
-from app.services import credits, langfuse, montage
+from app.services import credits, langfuse, lipsync, montage
 from app.services.choices import clip_model, clip_provider_name, reference_choice, start_image_provider
 from app.services.costs import WriteGate, tracked_call
 from app.services.flow import RUN_ASSET_KIND, latest_by_scene, references_to_make
@@ -200,8 +201,11 @@ async def _music_track(ctx: PipelineContext, track_id) -> MusicTrack | None:
 
 
 async def _download(ctx: PipelineContext, key: str, dest: Path) -> Path:
-    path = dest.with_suffix(Path(key).suffix)
-    path.write_bytes(await ctx.storage.get(key))
+    return _write(await ctx.storage.get(key), dest.with_suffix(Path(key).suffix))
+
+
+def _write(data: bytes, path: Path) -> Path:
+    path.write_bytes(data)
     return path
 
 
@@ -407,6 +411,16 @@ async def _selected_clip(ctx: PipelineContext, scene: Scene) -> bytes | None:
     return await ctx.storage.get(asset.key) if asset else None
 
 
+async def _selected_keyframe(ctx: PipelineContext, scene: Scene) -> bytes | None:
+    """Image de départ du clip choisi de la scène (asset `keyframe` rattaché au clip), None s'il n'en a pas."""
+    if scene.selected_clip_asset_id is None:
+        return None
+    keyframes = (await ctx.session.scalars(select(Asset).where(
+        Asset.project_id == scene.project_id, Asset.kind == "keyframe", Asset.scene_id == scene.id))).all()
+    kept = next((k for k in keyframes if k.meta.get("clip_asset_id") == scene.selected_clip_asset_id), None)
+    return await ctx.storage.get(kept.key) if kept else None
+
+
 async def _clips(ctx, project, step, scene_id):
     scenes = await _scenes(ctx, project.id, scene_id, "clips")
     params = {**step.params, **ctx.overrides}
@@ -447,6 +461,22 @@ async def _clips(ctx, project, step, scene_id):
         sent = [*([main_id] if main_id and main is not None else []), *extras]
         return [*([main] if main is not None else []), *(references[i] for i in extras)], sent
 
+    talking = [s for s in scenes if lipsync.talks(project, s)]
+    talking_ids = {s.id for s in talking}
+    recorded = await _imported_voices(ctx, project.id, talking)
+    to_speak = [s for s in talking if s.id not in recorded]
+    voices = await _voice_ids(ctx, project.id, to_speak) if to_speak else {}
+    talker, talk_model = (await ctx.registry.talker(), await ctx.app_settings.get("lipsync_model")) if talking else (None, "")
+
+    async def talk_voice(scene: Scene) -> Asset:
+        """Voix que l'avatar prononce : la voix importée de la scène, ou la dernière si elle dit ce texte avec cette voix,
+        sinon une nouvelle."""
+        latest = await ctx.writes.run(lambda: _latest_asset(ctx, project.id, "voice", scene.id))
+        if scene.id in recorded or lipsync.voice_matches(latest, scene.voice_text, voices[scene.id]):
+            assert latest is not None
+            return latest
+        return await _synthesize(ctx, project.id, step, scene, voices[scene.id], None)
+
     async def clip(scene: Scene) -> int:
         found, sent = await start_images(scene)
         images: list[bytes | None] = [*found] or [None]
@@ -454,19 +484,33 @@ async def _clips(ctx, project, step, scene_id):
         prompt = compact_prompt(scene.visual_prompt, [story_elements[i] for i in sent if i in story_elements])
         # `references` seulement s'il y en a : un provider sans cette option reste utilisable
         extra: dict[str, Any] = {"references": [*others]} if others else {}
-        if composer is not None and image is not None:  # Gemini replace les images dans la scène, ComfyUI l'anime
+        kept = await ctx.writes.run(lambda: _selected_keyframe(ctx, scene)) if params.get("reuse_start_image") else None
+        if kept is not None:
+            extra = {"start_image": kept}
+        elif composer is not None and image is not None:  # Gemini replace les images dans la scène, ComfyUI l'anime
             gemini, gemini_model = composer
             still = split_prompt(prompt)[0]
             composed = await _call(ctx, step, gemini, gemini_model, lambda: gemini.generate(
                 KONTEXT_PREFIX + still, model=gemini_model, references=images), input=langfuse.messages(KONTEXT_PREFIX + still))
             extra = {"start_image": composed.data}
-        result = await _call(ctx, step, video, model, lambda: video.generate(
-            prompt, model=model, duration_s=scene.duration_s + montage.PAD_S, image=image, **extra),
-            timeout=step_timeout("clips", provider_name), input=langfuse.messages(prompt))
+        meta: dict[str, Any] = {}
+        if talker is not None and scene.id in talking_ids:  # avatar parlant : la bouche suit la voix de la scène
+            spoken = await talk_voice(scene)
+            audio = await ctx.writes.run(lambda: ctx.storage.get(spoken.key))
+            with tempfile.TemporaryDirectory() as tmp:
+                voice_s = await montage.probe_duration(_write(audio, Path(tmp) / "voice.mp3"))
+            result = await _call(ctx, step, talker, talk_model, lambda: talker.talk(
+                prompt, model=talk_model, audio=audio, duration_s=voice_s + montage.PAD_S, image=image, **extra),
+                timeout=step_timeout("clips", "comfycloud"), input=langfuse.messages(prompt))
+            meta = {"voice_asset_id": spoken.id, "lipsync": talk_model}
+        else:
+            result = await _call(ctx, step, video, model, lambda: video.generate(
+                prompt, model=model, duration_s=scene.duration_s + montage.PAD_S, image=image, **extra),
+                timeout=step_timeout("clips", provider_name), input=langfuse.messages(prompt))
         produced[scene.id] = result.data
 
         async def keep() -> int:
-            asset = await _store(ctx, project.id, "clip", result, scene.id, step.run_id)
+            asset = await _store(ctx, project.id, "clip", result, scene.id, step.run_id, meta)
             if result.keyframe:  # image de départ (profil Précision) : conservée, rattachée à son clip, sans coût
                 keyframe = GenerationResult(result.keyframe, "image/png", 0.0, result.model)
                 await _store(ctx, project.id, "keyframe", keyframe, scene.id, meta={"clip_asset_id": asset.id})
@@ -485,26 +529,52 @@ async def _clips(ctx, project, step, scene_id):
     return {"asset_ids": _in_scene_order(scenes, done, todo, await _per_scene(ctx, todo, limit, clip))}
 
 
-async def _voice(ctx, project, step, scene_id):
-    """Une voix par scène : celle du personnage qui parle (`Scene.speaker`, voix choisie dans la story), sinon la voix du
-    narrateur (`params.voice_id`, sinon réglage `default_voice_id`)."""
-    narrator = step.params.get("voice_id") or await ctx.app_settings.get("default_voice_id")
-    scenes = await _scenes(ctx, project.id, scene_id, "voice")
-    characters = {e["id"]: e.get("voice_id", "") for e in (await _story_result(ctx, project.id)).get("elements", [])}
+async def _imported_voices(ctx, project_id: int, scenes: list[Scene]) -> set[int]:
+    """Scènes dont la dernière voix a été importée (voix enregistrée, `upload-voice`) : elle est gardée telle quelle, ni
+    synthétisée ni remplacée par un lancement de toutes les voix."""
+    latest = await latest_by_scene(ctx.session, project_id, "voice", [s.id for s in scenes])
+    if not latest:
+        return set()
+    assets = (await ctx.session.scalars(select(Asset).where(Asset.id.in_(latest.values())))).all()
+    return {a.scene_id for a in assets if a.meta.get("imported") and a.scene_id is not None}
+
+
+async def _voice_ids(ctx, project_id: int, scenes: list[Scene]) -> dict[int, str]:
+    """Voix de chaque scène : celle du personnage qui parle (`Scene.speaker`, voix choisie dans la story), sinon la voix
+    du narrateur (paramètre `voice_id` de l'étape voice, sinon réglage `default_voice_id`). Contrôlée avant tout appel."""
+    narrator = (await _step(ctx, project_id, "voice")).params.get("voice_id") or await ctx.app_settings.get("default_voice_id")
+    characters = {e["id"]: e.get("voice_id", "") for e in (await _story_result(ctx, project_id)).get("elements", [])}
     voices = {s.id: characters.get(s.speaker) or narrator for s in scenes}
     if not all(voices.values()):
         raise ProviderError("voice: aucune voix configurée (réglage default_voice_id ou paramètre voice_id)")
-    if not all(VOICE_ID.fullmatch(str(v)) for v in voices.values()):  # avant tout appel : l'identifiant finit dans l'URL
+    if not all(VOICE_ID.fullmatch(str(v)) for v in voices.values()):  # l'identifiant finit dans l'URL
         raise ProviderError("voice: identifiant de voix invalide (lettres, chiffres, _ et - uniquement)")
+    return voices
+
+
+async def _synthesize(ctx, project_id: int, step: Step, scene: Scene, voice_id: str, run: str | None) -> Asset:
+    """Voix off d'une scène, stockée avec son texte et sa voix (le lip-sync s'en sert pour la réutiliser)."""
     voice = await ctx.registry.voice()
+    result = await _call(ctx, step, voice, getattr(voice, "model", voice.name),
+                         lambda: voice.synthesize(scene.voice_text, voice_id=voice_id),
+                         input=langfuse.messages(scene.voice_text))
+    return await ctx.writes.run(lambda: _store(ctx, project_id, "voice", result, scene.id, run,
+                                               meta={"text": scene.voice_text, "voice_id": voice_id}))
+
+
+async def _voice(ctx, project, step, scene_id):
+    """Une voix par scène (voir `_voice_ids`). Lancée pour toutes les scènes, elle garde les voix importées ; une scène
+    choisie (`scene_id`) est toujours synthétisée."""
+    scenes = await _scenes(ctx, project.id, scene_id, "voice")
+    done, todo = await _skipped(ctx, project.id, step, scene_id, scenes)
+    if scene_id is None and (recorded := await _imported_voices(ctx, project.id, todo)):
+        done |= await latest_by_scene(ctx.session, project.id, "voice", recorded)
+        todo = [s for s in todo if s.id not in recorded]
+    voices = await _voice_ids(ctx, project.id, todo) if todo else {}
 
     async def speak(scene: Scene) -> int:
-        result = await _call(ctx, step, voice, getattr(voice, "model", voice.name),
-                             lambda: voice.synthesize(scene.voice_text, voice_id=voices[scene.id]),
-                             input=langfuse.messages(scene.voice_text))
-        return await ctx.writes.run(lambda: _store_id(ctx, project.id, "voice", result, scene.id, step.run_id))
+        return (await _synthesize(ctx, project.id, step, scene, voices[scene.id], step.run_id)).id
 
-    done, todo = await _skipped(ctx, project.id, step, scene_id, scenes)
     return {"asset_ids": _in_scene_order(scenes, done, todo, await _per_scene(ctx, todo, VOICE_CONCURRENCY, speak))}
 
 
@@ -517,7 +587,8 @@ async def _montage(ctx, project, step, scene_id):
     """Montage : chaque scène est encodée une fois (segment mis en cache dans le stockage, voir `montage.segment_key`) ;
     après une régénération de scène, seule cette scène est ré-encodée, les autres segments sont réutilisés."""
     scenes = await _scenes(ctx, project.id, None, "montage")
-    track = await _music_track(ctx, (await _step(ctx, project.id, "music")).params.get("track_id"))
+    music_params = (await _step(ctx, project.id, "music")).params
+    track = await _music_track(ctx, music_params.get("track_id"))
     reused = 0
     with tempfile.TemporaryDirectory() as tmp:
         d = Path(tmp)
@@ -526,7 +597,10 @@ async def _montage(ctx, project, step, scene_id):
             clip = await ctx.session.get(Asset, scene.selected_clip_asset_id) if scene.selected_clip_asset_id else None
             if clip is None:
                 raise ProviderError(f"montage: la scène {scene.position} n'a pas de clip sélectionné")
-            voice = await _latest_asset(ctx, project.id, "voice", scene.id)
+            # Avatar parlant : la voix dont la bouche suit le mouvement, même si une autre a été générée depuis.
+            synced = clip.meta.get("voice_asset_id")
+            voice = (await ctx.session.get(Asset, synced) if synced
+                     else await _latest_asset(ctx, project.id, "voice", scene.id))
             if voice is None:
                 raise ProviderError(f"montage: la scène {scene.position} n'a pas de voix")
             base = montage.segment_key(project.id, clip.id, voice.id)
@@ -539,7 +613,8 @@ async def _montage(ctx, project, step, scene_id):
                 continue
             segment = await montage.render_segment(
                 montage.SceneInput(await _download(ctx, clip.key, d / f"clip{scene.position}"),
-                                   await _download(ctx, voice.key, d / f"voice{scene.position}"), scene.voice_text),
+                                   await _download(ctx, voice.key, d / f"voice{scene.position}"), scene.voice_text,
+                                   synced=bool(synced)),
                 d, f"seg{scene.position}")
             await ctx.storage.put(f"{base}.mp4", segment.video.read_bytes(), "video/mp4")
             await ctx.storage.put(f"{base}.wav", segment.audio.read_bytes(), "audio/wav")
@@ -547,7 +622,8 @@ async def _montage(ctx, project, step, scene_id):
         music = await _download(ctx, track.key, d / "music") if track else None
         out = d / "render.mp4"
         duration = await montage.assemble(segments, music, out, d / "work",
-                                          str(step.params.get("subtitle_style") or montage.DEFAULT_SUBTITLE_STYLE))
+                                          str(step.params.get("subtitle_style") or montage.DEFAULT_SUBTITLE_STYLE),
+                                          montage.music_level(music_params.get("volume")))
         result = GenerationResult(out.read_bytes(), "video/mp4", 0.0, "ffmpeg")
     asset = await _store(ctx, project.id, "render", result)
     return {"asset_id": asset.id, "duration_s": round(duration, 2), "segments_reused": reused,
@@ -556,7 +632,7 @@ async def _montage(ctx, project, step, scene_id):
 
 async def _final(ctx, project, step, scene_id):
     angle = (await _step(ctx, project.id, "idea")).result.get("angle", "")
-    narration = " ".join(s.voice_text for s in (await ctx.session.scalars(
+    narration = " ".join(spoken(s.voice_text) for s in (await ctx.session.scalars(
         select(Scene).where(Scene.project_id == project.id).order_by(Scene.position))).all())
     prompt = (f"Titre de travail : {project.title}\n{project_brief(project)}\nAngle : {angle}\nVoix off : {narration}\n"
               "Propose les métadonnées de publication. Réponds avec "

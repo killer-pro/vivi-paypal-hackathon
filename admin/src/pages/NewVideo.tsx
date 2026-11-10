@@ -28,6 +28,7 @@ export default function NewVideo() {
   // Idée saisie sur la page Découvrir avant l'inscription ; effacée une fois la vidéo créée.
   const [subject, setSubject] = useState(() => pendingIdea() ?? "");
   const [style, setStyle] = useState("");
+  const [lipsync, setLipsync] = useState(false);
   const [duration, setDuration] = useState("30");
   const [sceneLength, setSceneLength] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,6 +67,7 @@ export default function NewVideo() {
             theme: subject.trim(),
             target_duration_s: parseDuration(duration),
             style,
+            lipsync,
           }),
         });
         id = project.id;
@@ -136,6 +138,17 @@ export default function NewVideo() {
         </AssistField>
         <div className="composer-bar">
           <Pills legend={t("Style")} name="style" options={styleOptions(styles ?? [], access?.locked.styles, access?.reasons.style ?? "")} value={style} onChange={setStyle} disabled={busy} />
+          <Pills
+            legend={t("Format")}
+            name="format"
+            options={[
+              { value: false, label: t("Voix off") },
+              { value: true, label: t("Avatar parlant"), hint: t("Le personnage qui parle s'adresse à la caméra, la bouche synchronisée sur sa voix (Comfy Cloud)") },
+            ]}
+            value={lipsync}
+            onChange={setLipsync}
+            disabled={busy}
+          />
           <Pills
             legend={t("Durée")}
             name="duration"

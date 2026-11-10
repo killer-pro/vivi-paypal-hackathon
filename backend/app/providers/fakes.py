@@ -165,6 +165,15 @@ class FakeVideo:
         return GenerationResult(ensure_non_empty(data, "clip"), "video/mp4", self.estimate_cost(model, duration_s), model,
                                 self.keyframe)
 
+    async def talk(self, prompt, *, model, audio, duration_s, image=None, references=(), start_image=None) -> GenerationResult:
+        """Avatar parlant simulé : un clip de la durée de la voix."""
+        if self.fail_with:
+            raise self.fail_with
+        data = _ffmpeg("-f", "lavfi", "-i", f"color=c=green:s=320x568:d={duration_s:.2f}:r=16", "-pix_fmt", "yuv420p",
+                       suffix=".mp4")
+        return GenerationResult(ensure_non_empty(data, "avatar parlant"), "video/mp4",
+                                self.estimate_cost(model, duration_s), model, self.keyframe)
+
     async def availability(self) -> dict[str, Availability]:
         return dict.fromkeys(self.models, Availability(True))
 

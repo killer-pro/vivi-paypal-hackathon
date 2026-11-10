@@ -46,6 +46,8 @@ export default function ClipsPanel(props: PanelProps) {
   // Remonte l'éditeur de prompt (consigne et historique d'amélioration remis à zéro) après un envoi.
   const [sent, setSent] = useState(0);
   const [uploading, setUploading] = useState(false);
+  // Import d'une retouche (écran incrusté, plan de coupe…) du clip lip-sync choisi : la variante garde sa voix calée.
+  const [retouch, setRetouch] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Asset | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -74,13 +76,14 @@ export default function ClipsPanel(props: PanelProps) {
   const missing = project.scenes.filter((s) => s.selected_clip_asset_id === null).length;
   const withoutClip = missingScenes(project.scenes, project.assets, "clip").length;
   const variants = project.assets.filter((a) => a.kind === "clip" && a.scene_id === scene?.id);
+  const chosenLipsync = variants.find((a) => a.id === scene?.selected_clip_asset_id && a.meta?.voice_asset_id != null);
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file || !scene) return;
     setUploading(true);
     try {
-      await flow.uploadClip(scene.id, file);
+      await flow.uploadClip(scene.id, file, retouch && chosenLipsync ? chosenLipsync.id : undefined);
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -144,6 +147,15 @@ export default function ClipsPanel(props: PanelProps) {
       }
     >
       <CastStrip cast={cast} flow={flow} />
+      <label className="scene-element" title={t("Modèle choisi dans Réglages ; les autres scènes restent des clips sur la voix off")}>
+        <input
+          type="checkbox"
+          checked={project.lipsync}
+          disabled={flow.busy || locked}
+          onChange={(e) => flow.setLipsync(e.target.checked)}
+        />
+        {t("Avatar parlant : le personnage qui parle à l'écran est animé sur sa voix (lip-sync, Comfy Cloud)")}
+      </label>
       {refStep && <ReferenceSection {...props} refStep={refStep} cast={cast} models={models} imageDefault={settings.data?.image_provider ?? "gemini"} />}
 
       {/* ── Profil de génération vidéo (dans Avancé) ── */}
@@ -195,6 +207,17 @@ export default function ClipsPanel(props: PanelProps) {
             {t("Enchaîner : la première image part de la dernière image de la scène précédente")}
           </label>
         )}
+        {scene && project.lipsync && scene.on_screen && (
+          <label className="scene-element" title={t("Décochée : clip animé ordinaire (effets, mouvements), le personnage parle hors champ")}>
+            <input
+              type="checkbox"
+              checked={scene.lipsync}
+              disabled={flow.busy}
+              onChange={(e) => flow.setSceneLipsync(scene.id, e.target.checked)}
+            />
+            {t("Parle face caméra : la bouche est animée sur sa voix (lip-sync)")}
+          </label>
+        )}
         {scene && elements.length > 0 && (
           <fieldset className="scene-elements" disabled={flow.busy}>
             <legend>{t("Images envoyées avec le clip ({n} au plus : en cocher une de plus retire la plus ancienne)", { n: MAX_SCENE_IMAGES })}</legend>
@@ -238,6 +261,12 @@ export default function ClipsPanel(props: PanelProps) {
             </label>
           </div>
         )}
+        {chosenLipsync && (
+          <label className="scene-element" title={t("La vidéo importée reprend le clip lip-sync choisi à la même durée (écran incrusté, plan de coupe) : elle garde sa voix, montée sans changement de vitesse.")}>
+            <input type="checkbox" checked={retouch} onChange={(e) => setRetouch(e.target.checked)} disabled={locked || uploading} />
+            {t("Importer comme retouche du clip lip-sync choisi (garde sa voix)")}
+          </label>
+        )}
 
         {variants.length === 0 ? (
           <p className="empty-line">{t("Aucun clip pour cette scène.")}</p>
@@ -263,6 +292,7 @@ export default function ClipsPanel(props: PanelProps) {
                       <span className="variant-label">
                         Variante {clip.variant}
                         {clip.meta?.model === "upload" && <span className="variant-badge" title={importedTitle(clip)}>{t(" (importée)")}</span>}
+                        {clip.meta?.lipsync != null && <span className="variant-badge">{t(" (lip-sync)")}</span>}
                       </span>
                       <button
                         type="button"

@@ -76,6 +76,15 @@
   line-height: 1.5;
 }
 
+/* Adresse non confirmée : renvoi du lien de confirmation, avant le bouton de connexion. */
+.login-resend {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 14px;
+}
+
 /* Liens vers les autres écrans de compte, séparés de l'action par un filet. */
 .login-links {
   display: flex;

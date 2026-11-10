@@ -5,7 +5,7 @@ l'administrateur (`ADMIN_ONLY`, `403 "Réservé à l'administrateur"` pour un au
 `GET /api/settings/editor` restent ouverts à tout compte connecté : l'éditeur en a besoin.
 
 - `GET /api/settings/editor` : choix par défaut affichés par l'éditeur (`EDITOR_KEYS` : `default_voice_id`,
-  `voice_catalog`, `default_video_provider`, `default_video_model`, `image_provider`, `start_image_provider`), sans
+  `voice_catalog`, `default_video_provider`, `default_video_model`, `image_provider`, `start_image_provider`, `lipsync_model`), sans
   aucun secret.
 - `GET /api/settings` : `AppSettings.all_masked()` (secrets affichés `••••` + 4 derniers caractères).
 - `PUT /api/settings {clé: valeur}` : `400` si une clé n'est pas dans `EDITABLE_KEYS` ou si `llm_provider` n'est pas

@@ -6,6 +6,7 @@ import {
   affectedDownstream,
   availableActions,
   hasResult,
+  RERUN_WHEN_STALE,
   resumeInfo,
   STEP_LABELS,
   STOPPED_BY_USER,
@@ -23,6 +24,7 @@ import { t } from "../i18n";
 
 const REGENERATE_ALL_HINT = t("Refait toutes les scènes (nouveaux appels payants)");
 const STALE_HINT = t("Une étape précédente a changé depuis ce résultat : régénérez-le, ou validez-le tel quel s'il convient toujours.");
+const RERUN_HINT = t("Les clips ou les voix ont changé depuis ce résultat : relancez-le pour les prendre en compte.");
 
 /** Ce que chaque panneau d'étape reçoit de l'éditeur. */
 export interface PanelProps {
@@ -128,7 +130,7 @@ export default function StepPanel({
     <section className={`step-panel st-${step.status}`} aria-labelledby={titleId}>
       <header className="step-panel-head">
         <h2 id={titleId}>{STEP_LABELS[step.name]}</h2>
-        <span className="status-badge" title={stale ? STALE_HINT : undefined}>
+        <span className="status-badge" title={stale ? (RERUN_WHEN_STALE.includes(step.name) ? RERUN_HINT : STALE_HINT) : undefined}>
           {statusLabel(step)}
         </span>
       </header>

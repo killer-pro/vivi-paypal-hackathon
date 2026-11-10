@@ -121,14 +121,20 @@ export interface StepActions {
   stale: boolean;
 }
 
-/** Actions proposées pour une étape. `stale → approved` (valider tel quel) est permis par le backend. */
-export function availableActions(step: Pick<Step, "status">, previousApproved: boolean): StepActions {
+/** Étapes dont le résultat périmé se relance au lieu de se valider tel quel (`RERUN_WHEN_STALE` du backend) : un
+ *  montage périmé est une vidéo bâtie sur d'anciens clips ou voix. */
+export const RERUN_WHEN_STALE: readonly StepName[] = ["montage"];
+
+/** Actions proposées pour une étape. `stale → approved` (valider tel quel) est permis par le backend, sauf pour
+ *  `RERUN_WHEN_STALE`. */
+export function availableActions(step: Pick<Step, "name" | "status">, previousApproved: boolean): StepActions {
   const { status } = step;
   const canRun = previousApproved && status !== "running";
+  const approvable = status === "awaiting_validation" || (status === "stale" && !RERUN_WHEN_STALE.includes(step.name));
   return {
     canRun,
     // Valider suppose l'amont validé : un résultat bâti sur une étape périmée ne doit pas être entériné.
-    canApprove: previousApproved && (status === "awaiting_validation" || status === "stale"),
+    canApprove: previousApproved && approvable,
     showRetry: canRun && status === "failed",
     stale: status === "stale",
   };

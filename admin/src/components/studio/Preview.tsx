@@ -12,6 +12,7 @@ export default function Preview({
   voice,
   music,
   scene,
+  subtitles,
   total,
   onEditClip,
   onEditVoice,
@@ -23,6 +24,8 @@ export default function Preview({
   /** Musique de fond choisie (sans rendu : elle est mixée dans le rendu). */
   music?: string;
   scene: Scene | null;
+  /** Sous-titre du texte de la scène sur le clip, comme au montage (style « Sans » : aucun). */
+  subtitles: boolean;
   total: number;
   /** Ouvre l'étape Clips sur la scène, prompt à préciser. */
   onEditClip: () => void;
@@ -53,7 +56,7 @@ export default function Preview({
         )}
         {!render && voice && <audio ref={audio} src={voice} preload="auto" />}
         {!render && music && <audio ref={musicAudio} src={music} loop preload="auto" />}
-        {!render && scene && <p className="preview-subtitle">{scene.voice_text}</p>}
+        {!render && scene && subtitles && <p className="preview-subtitle">{scene.voice_text}</p>}
       </div>
       <div className="transport">
         <button

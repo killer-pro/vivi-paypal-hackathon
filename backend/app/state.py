@@ -1,5 +1,8 @@
 STEP_NAMES = ["idea", "story", "script", "reference", "clips", "voice", "music", "montage", "final"]
 OPTIONAL_STEPS = {"reference"}
+# Étapes dont le résultat périmé ne se valide pas tel quel : un montage périmé est une vidéo bâtie sur d'anciens clips ou
+# voix, l'exporter servirait l'ancien rendu. Il faut le relancer.
+RERUN_WHEN_STALE = {"montage"}
 
 
 class InvalidTransition(Exception):

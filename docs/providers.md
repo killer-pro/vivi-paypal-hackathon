@@ -85,7 +85,10 @@
   relançable `NO_PLAN`. Disponible dès qu'une clé est saisie (pas de requête par carte). 2 clips en parallèle
   (`CLIP_CONCURRENCY`) ; image de départ par Flux Kontext sur le cloud, comme en local (`COMFY_PROVIDERS` de
   `registry.py`). `ComfyCloudImage` : image de référence Flux dev sur le cloud (`image_provider=comfycloud`).
-- `ElevenLabsVoice` : synthèse vocale ; coût = nb de caractères x `PRICE_PER_CHAR`.
+  `talk` : avatar parlant (lip-sync) à partir d'une image et d'une voix, modèle du réglage `lipsync_model` (`s2v`,
+  `infinitetalk`, `ltx`), coût `cloud_talk_usd` ; `ProviderRegistry.talker()` le fournit (`FakeVideo.talk` en mode factice).
+  Voir `avatar-parlant.md`.
+- `ElevenLabsVoice` : synthèse vocale ; coût = nb de caractères x `PRICE_PER_CHAR`. Modèle `eleven_multilingual_v2`, ou `eleven_v3` dès que le texte contient une balise d'émotion entre crochets (`[excited]`, `[laughs]`, `[whispers]`…) : v3 la joue au lieu de la lire. `spoken()` retire ces balises des sous-titres, du compte de mots du script et du texte envoyé au LLM des métadonnées. Les prompts du script et de l'histoire autorisent une ou deux balises par scène.
 - Erreurs HTTP : 5xx et 429 retryables, autres 4xx non (`raise_for_provider`).
 - `AppSettings` : lit la table `settings` puis l'environnement ; seules les clés de `EDITABLE_KEYS` sont modifiables ; les secrets sont masqués (`••••` + 4 derniers caractères).
 - `ProviderRegistry` : construit les providers à la demande ; `FAKE_PROVIDERS=true` renvoie les fakes (quel que soit

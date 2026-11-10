@@ -1,5 +1,5 @@
 import AudioPlayer from "../AudioPlayer";
-import type { ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { useApi, type MusicTrack } from "../../api";
 import StepPanel, { type PanelProps } from "../StepPanel";
 import ImportTrack from "../ImportTrack";
@@ -7,6 +7,7 @@ import { ErrorState } from "../ui";
 import { clock } from "../../format";
 import { useMe } from "../../hooks/useMe";
 import { t } from "../../i18n";
+import { musicVolume } from "../../montage";
 
 export default function MusicPanel(props: PanelProps) {
   const { flow, step, locked } = props;
@@ -14,6 +15,14 @@ export default function MusicPanel(props: PanelProps) {
   const isAdmin = useMe()?.role === "admin"; // la bibliothèque est commune : seul l'administrateur l'enrichit
   const selected = (step.params.track_id as number | null | undefined) ?? null;
   const choose = (trackId: number | null) => flow.patch("music", { params: { ...step.params, track_id: trackId } });
+  const saved = musicVolume(step.params);
+  const [dragged, setDragged] = useState<number | null>(null);
+  const volume = dragged ?? saved;
+  // Enregistré au relâchement du curseur (pas à chaque cran) : le montage devient à refaire.
+  const saveVolume = () => {
+    if (volume !== saved) flow.patch("music", { params: { ...step.params, volume } });
+  };
+  const volumeId = useId();
 
   const option = (id: number | null, children: ReactNode) => (
     <label key={id ?? "none"} className={selected === id ? "track is-chosen" : "track"}>
@@ -32,6 +41,26 @@ export default function MusicPanel(props: PanelProps) {
               if (!locked) choose(track.id); // la piste importée est aussitôt choisie
             }}
           />
+        </div>
+      )}
+      {selected !== null && (
+        <div className="music-volume">
+          <label htmlFor={volumeId}>{t("Volume sous la voix")}</label>
+          <input
+            id={volumeId}
+            type="range"
+            min={0}
+            max={100}
+            step={1}
+            value={volume}
+            disabled={locked}
+            onChange={(e) => setDragged(Number(e.target.value))}
+            onPointerUp={saveVolume}
+            onKeyUp={saveVolume}
+            onBlur={saveVolume}
+          />
+          <output htmlFor={volumeId}>{volume} %</output>
+          <p className="muted">{t("Appliqué à l'aperçu et au prochain montage.")}</p>
         </div>
       )}
       {tracks.error && <ErrorState message={tracks.error} onRetry={tracks.reload} />}

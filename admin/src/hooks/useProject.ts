@@ -50,16 +50,22 @@ export function useProject(id: number) {
     return () => clearInterval(timer);
   }, [running, reload]);
 
-  const act = useCallback(
-    async (scope: ActionScope, path: string, method: string, body?: unknown): Promise<boolean> => {
+  /** Requête sur le projet : un FormData (envoi de fichier) part tel quel ; le reste en JSON. */
+  const send = useCallback(
+    <T,>(path: string, method: string, body?: unknown) =>
+      api<T>(`${base}${path}`, { method, body: body === undefined || body instanceof FormData ? body : JSON.stringify(body) }),
+    [base],
+  );
+
+  /** Exécute une action (une ou plusieurs requêtes), puis recharge le projet. */
+  const perform = useCallback(
+    async (scope: ActionScope, task: () => Promise<unknown>): Promise<boolean> => {
       if (inFlight.current) return false;
       inFlight.current = true;
       setBusy(true);
       setActionError(null);
       try {
-        // Un FormData (envoi de fichier) part tel quel ; le reste en JSON.
-        const payload = body === undefined || body instanceof FormData ? body : JSON.stringify(body);
-        await api(`${base}${path}`, { method, body: payload });
+        await task();
         return true;
       } catch (err) {
         setActionError({ scope, message: errorMessage(err) });
@@ -70,7 +76,12 @@ export function useProject(id: number) {
         reload();
       }
     },
-    [base, reload],
+    [reload],
+  );
+
+  const act = useCallback(
+    (scope: ActionScope, path: string, method: string, body?: unknown) => perform(scope, () => send(path, method, body)),
+    [perform, send],
   );
 
   /** Arrête la génération en cours de l'étape : l'étape passe en échec « Arrêtée par l'utilisateur », le produit est gardé. */
@@ -119,11 +130,24 @@ export function useProject(id: number) {
       act("clips", `/scenes/${sceneId}/reference`, "PUT", { reference, elements }),
     setSceneContinuity: (sceneId: number, continuity: "cut" | "continue") =>
       act("clips", `/scenes/${sceneId}/continuity`, "PUT", { continuity }),
+    setSceneLipsync: (sceneId: number, lipsync: boolean) =>
+      act("clips", `/scenes/${sceneId}/lipsync`, "PUT", { lipsync }),
     deleteAsset: (assetId: number) => act("clips", `/assets/${assetId}`, "DELETE"),
-    uploadClip: (sceneId: number, file: File) =>
-      act("clips", `/scenes/${sceneId}/upload-clip`, "POST", formOf({ file })),
+    uploadClip: (sceneId: number, file: File, retouches?: number) =>
+      act("clips", `/scenes/${sceneId}/upload-clip`, "POST", formOf({ file, ...(retouches ? { retouches: String(retouches) } : {}) })),
+    /** Voix enregistrée de la scène (langue que la synthèse ne parle pas, voix réelle). */
+    uploadVoice: (sceneId: number, file: File) => act("voice", `/scenes/${sceneId}/upload-voice`, "POST", formOf({ file })),
     uploadReference: (file: File, ref = "") => act("clips", "/reference/upload", "POST", formOf({ file, ref })),
+    /** Nouvel élément créé à partir d'une image importée (description facultative). */
+    addReferenceImage: (name: string, prompt: string, file: File) =>
+      perform("clips", async () => {
+        const element = await send<{ id: string }>("/references", "POST", { name, prompt });
+        await send("/reference/upload", "POST", formOf({ file, ref: element.id }));
+      }),
+    /** Reprend une version précédente de l'image d'un élément (elle redevient celle des clips). */
+    restoreReference: (assetId: number) => act("clips", `/reference/${assetId}/restore`, "POST"),
     updateProject: (body: ProjectPatch) => act("idea", "", "PATCH", body),
+    setLipsync: (lipsync: boolean) => act("clips", "", "PATCH", { lipsync }),
     rename: (title: string) => act("studio", "", "PATCH", { title }),
     /** Génère (ou régénère) le plan : idée puis script, sans lancer les clips. */
     generatePlan: () => act("studio", "/plan/generate", "POST"),

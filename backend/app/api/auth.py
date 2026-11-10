@@ -36,6 +36,7 @@ TOKEN_TTL = {"verify": timedelta(hours=48), "reset": timedelta(hours=1)}
 LINK_PATH = {"verify": "/verify", "reset": "/reset"}
 INVALID_LINK = "Lien invalide ou expiré"
 BAD_CREDENTIALS = "Email ou mot de passe incorrect"
+UNVERIFIED = "Confirmez votre adresse e-mail : ouvrez le lien reçu (ou demandez-en un nouveau)"
 OK = {"ok": True}
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -127,7 +128,7 @@ def make_session_cookie(user_id: int, epoch: int) -> str:
 
 
 async def _session_user(request: Request, session: AsyncSession) -> User | None:
-    """Titulaire d'un cookie valide : signé, non expiré, au format actuel, compte existant et époque à jour."""
+    """Titulaire d'un cookie valide : signé, non expiré, au format actuel, compte existant, vérifié et époque à jour."""
     try:
         data = _serializer().loads(request.cookies.get(COOKIE_NAME, ""), max_age=MAX_AGE_S)
     except BadSignature:  # inclut SignatureExpired
@@ -135,7 +136,8 @@ async def _session_user(request: Request, session: AsyncSession) -> User | None:
     if not isinstance(data, dict) or not isinstance(data.get("uid"), int):  # ancien format compris
         return None
     user = await session.get(User, data["uid"])
-    return user if user and data.get("epoch") == user.session_epoch else None
+    valid = user and data.get("epoch") == user.session_epoch and user.email_verified_at is not None
+    return user if valid else None
 
 
 async def current_user(request: Request, session: AsyncSession = Depends(get_session)) -> User:
@@ -217,6 +219,24 @@ async def _mark_verified(session: AsyncSession, user: User) -> None:
     await grant_signup_credits(session, user, AppSettings(session))
 
 
+def _open_session(response: Response, user: User) -> None:
+    response.set_cookie(COOKIE_NAME, make_session_cookie(user.id, user.session_epoch), max_age=MAX_AGE_S,
+                        **COOKIE_FLAGS)
+
+
+async def _authenticate(body: LoginIn, request: Request, session: AsyncSession) -> User:
+    """Compte dont le mot de passe est juste (tentatives limitées par client) ; 401 uniforme sinon."""
+    client = _client(request)
+    _check_throttle(throttle, client)
+    user = await _user_by_email(session, body.email)
+    valid = verify_password(body.password, user.password_hash if user else _DUMMY_HASH)
+    if user is None or not valid:
+        throttle.fail(client)
+        raise HTTPException(401, BAD_CREDENTIALS)
+    throttle.reset(client)
+    return user
+
+
 def _me(user: User) -> dict:
     return {"id": user.id, "email": user.email, "role": user.role, "email_verified": user.email_verified_at is not None,
             "subscribed": user.is_subscribed, "subscription_ends_at": user.subscription_ends_at}
@@ -246,19 +266,23 @@ async def register(body: CredentialsIn, request: Request, background: Background
 
 
 @router.post("/verify")
-async def verify(body: TokenIn, session: AsyncSession = Depends(get_session)) -> dict:
-    """Marque l'adresse vérifiée et coupe les sessions ouvertes avant (celle d'un tiers qui aurait inscrit l'adresse)."""
+async def verify(body: TokenIn, response: Response, session: AsyncSession = Depends(get_session)) -> dict:
+    """Marque l'adresse vérifiée, coupe les sessions ouvertes avant et connecte le titulaire du lien."""
     user = await _consume_token(session, body.token, "verify")
     await _mark_verified(session, user)
     user.session_epoch += 1
     await session.commit()
-    return OK
+    _open_session(response, user)
+    return _me(user)
 
 
 @router.post("/resend", status_code=202)
-async def resend(request: Request, background: BackgroundTasks, user: User = Depends(current_user),
+async def resend(body: LoginIn, request: Request, background: BackgroundTasks,
                  session: AsyncSession = Depends(get_session), mailer: Mailer = Depends(get_mailer)) -> dict:
+    """Nouveau lien de vérification, demandé depuis l'écran de connexion : le mot de passe est exigé, pour que seul le
+    titulaire du compte puisse le redemander."""
     _count_request(request)
+    user = await _authenticate(body, request, session)
     if user.email_verified_at is None:
         await _send_link(session, background, mailer, user, "verify")
     return OK
@@ -266,16 +290,11 @@ async def resend(request: Request, background: BackgroundTasks, user: User = Dep
 
 @router.post("/login")
 async def login(body: LoginIn, request: Request, response: Response, session: AsyncSession = Depends(get_session)) -> dict:
-    client = _client(request)
-    _check_throttle(throttle, client)
-    user = await _user_by_email(session, body.email)
-    valid = verify_password(body.password, user.password_hash if user else _DUMMY_HASH)
-    if user is None or not valid:
-        throttle.fail(client)
-        raise HTTPException(401, BAD_CREDENTIALS)
-    throttle.reset(client)
-    response.set_cookie(COOKIE_NAME, make_session_cookie(user.id, user.session_epoch), max_age=MAX_AGE_S,
-                        **COOKIE_FLAGS)
+    """Mot de passe juste mais adresse non confirmée : 403, sans session (seul le titulaire du mot de passe l'apprend)."""
+    user = await _authenticate(body, request, session)
+    if user.email_verified_at is None:
+        raise HTTPException(403, UNVERIFIED)
+    _open_session(response, user)
     return _me(user)
 
 

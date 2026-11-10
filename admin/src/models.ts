@@ -116,6 +116,13 @@ export function startImageLabels(videoProvider: string): Record<string, string> 
   return videoProvider === "comfycloud" ? { ...START_IMAGE_LABELS, comfyui: t("Flux Kontext (Comfy Cloud, payant)") } : START_IMAGE_LABELS;
 }
 
+/** Modèles d'avatar parlant (réglage `lipsync_model`), exécutés sur Comfy Cloud. */
+export const LIPSYNC_MODEL_LABELS: Record<string, string> = {
+  s2v: t("Wan 2.2 S2V (rapide, le moins cher)"),
+  infinitetalk: t("InfiniteTalk (expressions les plus vivantes)"),
+  ltx: t("LTX-2.3 (image la plus nette)"),
+};
+
 export const IMAGE_PROVIDER_LABELS: Record<string, string> = {
   gemini: "Gemini",
   fal: "fal.ai",

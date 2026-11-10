@@ -31,6 +31,10 @@ async def login(c, email="a@x.com", password=PASSWORD):
     return await c.post("/api/auth/login", json={"email": email, "password": password})
 
 
+async def resend(c, email="a@x.com", password=PASSWORD):
+    return await c.post("/api/auth/resend", json={"email": email, "password": password})
+
+
 async def user_by_email(session, email) -> User | None:
     return (await session.execute(select(User).where(User.email == email))).scalar_one_or_none()
 
@@ -57,15 +61,14 @@ async def test_register_sends_verification_and_verify_marks_verified(api_as, mai
     assert r.status_code == 202 and r.json() == {"ok": True}
     [mail] = mailer.outbox
     assert mail.to == "a@x.com" and f"{settings.public_url}/verify?token=" in mail.body
-    assert (await login(c)).status_code == 200
-    assert (await c.get("/api/auth/me")).json()["email_verified"] is False
+    r = await login(c)
+    assert r.status_code == 403 and r.json()["detail"] == auth.UNVERIFIED and "set-cookie" not in r.headers
     r = await c.post("/api/auth/verify", json={"token": link_token(mail, "/verify")})
-    assert r.status_code == 200 and r.json() == {"ok": True}
-    assert (await c.get("/api/auth/me")).status_code == 401  # la vérification coupe les sessions ouvertes avant elle
-    assert (await login(c)).status_code == 200
+    assert r.status_code == 200 and r.json()["email_verified"] is True  # le lien connecte directement
     me = (await c.get("/api/auth/me")).json()
     assert me["email"] == "a@x.com" and me["role"] == "user" and me["email_verified"] is True
     assert set(me) == {"id", "email", "role", "email_verified", "subscribed", "subscription_ends_at"}
+    assert (await login(c)).status_code == 200
 
 
 async def test_register_normalizes_email(api_as, session, mailer):
@@ -74,7 +77,7 @@ async def test_register_normalizes_email(api_as, session, mailer):
     assert (await register(c, "a@x.com")).status_code == 202
     assert len((await session.execute(select(User).where(User.email.ilike("%a@x.com%")))).scalars().all()) == 1
     assert (await user_by_email(session, "a@x.com")) is not None
-    assert (await login(c, "A@X.COM")).status_code == 200
+    assert (await login(c, "A@X.COM")).status_code == 403  # compte retrouvé (mot de passe juste), adresse à confirmer
 
 
 async def test_register_existing_email_same_response(api_as, make_user, mailer):
@@ -102,7 +105,7 @@ async def test_pre_registration_takeover_is_defeated(api_as, session, mailer):
     un lien de réinitialisation, qui lui rend le compte et coupe la session de l'attaquant."""
     attacker = await api_as(None)
     assert (await register(attacker, "victime@x.com", "mot-de-l-attaquant")).status_code == 202
-    assert (await login(attacker, "victime@x.com", "mot-de-l-attaquant")).status_code == 200
+    assert (await login(attacker, "victime@x.com", "mot-de-l-attaquant")).status_code == 403  # aucune session
     victim = await api_as(None)
     mailer.outbox.clear()
     assert (await register(victim, "victime@x.com", "mot-de-la-victime")).status_code == 202
@@ -110,7 +113,6 @@ async def test_pre_registration_takeover_is_defeated(api_as, session, mailer):
     assert "/verify?token=" not in mail.body
     r = await victim.post("/api/auth/reset", json={"token": link_token(mail, "/reset"), "password": NEW_PASSWORD})
     assert r.status_code == 200
-    assert (await attacker.get("/api/auth/me")).status_code == 401
     assert (await login(victim, "victime@x.com", "mot-de-l-attaquant")).status_code == 401
     assert (await login(victim, "victime@x.com", NEW_PASSWORD)).status_code == 200
     assert (await victim.get("/api/auth/me")).json()["email_verified"] is True
@@ -119,18 +121,26 @@ async def test_pre_registration_takeover_is_defeated(api_as, session, mailer):
 
 async def test_verify_revokes_sessions_opened_before(api_as, make_user, mailer):
     user = await make_user("a@x.com", verified=False)
-    before = await api_as(user)
-    assert (await before.post("/api/auth/resend")).status_code == 202
+    old_cookie = auth.make_session_cookie(user.id, user.session_epoch)
+    assert (await resend(await api_as(None))).status_code == 202
     r = await (await api_as(None)).post("/api/auth/verify", json={"token": link_token(mailer.outbox[0], "/verify")})
-    assert r.status_code == 200
-    assert (await before.get("/api/auth/me")).status_code == 401 and user.session_epoch == 1
+    assert r.status_code == 200 and user.session_epoch == 1
+    before = await api_as(None)
+    before.cookies.set("session", old_cookie)
+    assert (await before.get("/api/auth/me")).status_code == 401
+
+
+async def test_unverified_session_cookie_is_rejected(api_as, make_user):
+    """Un cookie d'avant la règle (compte non vérifié) n'ouvre plus rien."""
+    c = await api_as(await make_user("a@x.com", verified=False))
+    assert (await c.get("/api/auth/me")).status_code == 401
+    assert (await c.get("/api/projects")).status_code == 401
 
 
 async def test_verify_token_invalid_cases(api_as, session, make_user, mailer):
     c = await api_as(None)
     await register(c)
     user = await user_by_email(session, "a@x.com")
-    connected = await api_as(user)
     verify_token = link_token(mailer.outbox[-1], "/verify")
     await c.post("/api/auth/forgot", json={"email": "a@x.com"})
     reset_token = link_token(mailer.outbox[-1], "/reset")
@@ -147,7 +157,7 @@ async def test_verify_token_invalid_cases(api_as, session, make_user, mailer):
     await session.commit()
     assert await rejected(verify_token)  # expiré
 
-    await connected.post("/api/auth/resend")  # nouveau lien (compte non vérifié)
+    await resend(c)  # nouveau lien (compte non vérifié)
     fresh = link_token(mailer.outbox[-1], "/verify")
     assert (await c.post("/api/auth/verify", json={"token": fresh})).status_code == 200
     await session.refresh(user)
@@ -162,7 +172,7 @@ async def test_reset_rejects_a_verification_token(api_as, session, mailer):
     await register(c)
     r = await c.post("/api/auth/reset", json={"token": link_token(mailer.outbox[-1], "/verify"), "password": NEW_PASSWORD})
     assert r.status_code == 400 and r.json()["detail"] == "Lien invalide ou expiré"
-    assert (await login(c)).status_code == 200 and (await login(c, password=NEW_PASSWORD)).status_code == 401
+    assert (await login(c)).status_code == 403 and (await login(c, password=NEW_PASSWORD)).status_code == 401
 
 
 async def test_login_wrong_password_and_unknown_email_same_message(api_as, make_user):
@@ -193,29 +203,40 @@ async def test_login_sets_secure_cookie_and_me(api_as, make_user):
     assert (await c.get("/api/auth/me")).json()["email"] == "a@x.com"
 
 
-async def test_unverified_user_can_login_and_me_reports_it(api_as, make_user):
+async def test_unverified_user_cannot_login(api_as, make_user):
     await make_user("a@x.com", verified=False)
     c = await api_as(None)
-    assert (await login(c)).status_code == 200
-    assert (await c.get("/api/auth/me")).json()["email_verified"] is False
-    assert (await c.get("/api/projects")).status_code == 200
+    r = await login(c)
+    assert r.status_code == 403 and r.json()["detail"] == auth.UNVERIFIED and "set-cookie" not in r.headers
+    assert (await login(c, password="mauvais-mot-de-passe")).status_code == 401  # rien n'est révélé sans le mot de passe
+    assert (await c.get("/api/projects")).status_code == 401
 
 
 async def test_resend_sends_link_only_when_unverified(api_as, make_user, mailer):
-    pending = await api_as(await make_user("attente@x.com", verified=False))
-    done = await api_as(await make_user("ok@x.com", verified=True))
-    assert (await pending.post("/api/auth/resend")).status_code == 202
-    assert (await done.post("/api/auth/resend")).status_code == 202
+    await make_user("attente@x.com", verified=False)
+    await make_user("ok@x.com", verified=True)
+    c = await api_as(None)
+    assert (await resend(c, "attente@x.com")).status_code == 202
+    assert (await resend(c, "ok@x.com")).status_code == 202
     assert [m.to for m in mailer.outbox] == ["attente@x.com"]
     assert "/verify?token=" in mailer.outbox[0].body
-    assert (await (await api_as(None)).post("/api/auth/resend")).status_code == 401
+
+
+async def test_resend_requires_the_password(api_as, make_user, mailer):
+    await make_user("attente@x.com", verified=False)
+    c = await api_as(None)
+    for email, password in (("attente@x.com", "mauvais-mot-de-passe"), ("inconnu@x.com", PASSWORD)):
+        r = await resend(c, email, password)
+        assert r.status_code == 401 and r.json()["detail"] == auth.BAD_CREDENTIALS
+    assert mailer.outbox == []
 
 
 async def test_resend_is_rate_limited(api_as, make_user):
-    c = await api_as(await make_user("attente@x.com", verified=False))
+    await make_user("attente@x.com", verified=False)
+    c = await api_as(None)
     for _ in range(auth.signup_throttle.max_failures):
-        assert (await c.post("/api/auth/resend")).status_code == 202
-    r = await c.post("/api/auth/resend")
+        assert (await resend(c, "attente@x.com")).status_code == 202
+    r = await resend(c, "attente@x.com")
     assert r.status_code == 429 and int(r.headers["retry-after"]) > 0
 
 
@@ -311,10 +332,10 @@ async def test_mail_failure_keeps_uniform_response(api_as, make_user, monkeypatc
     monkeypatch.setattr(auth, "new_token", lambda: tokens.append(real()[0]) or (tokens[-1], auth.token_hash(tokens[-1])))
     app.dependency_overrides[get_mailer] = lambda: Broken()
     c = await api_as(None)
-    pending = await api_as(await make_user("a@x.com", verified=False))
+    await make_user("a@x.com", verified=False)
     with caplog.at_level(logging.ERROR, logger="app"):
         responses = [await register(c, "neuf@x.com"), await c.post("/api/auth/forgot", json={"email": "a@x.com"}),
-                     await pending.post("/api/auth/resend")]
+                     await resend(c)]
     assert [(r.status_code, r.json()) for r in responses] == [(202, {"ok": True})] * 3
     assert all("smtp.secret.example" not in r.text for r in responses)
     assert len(tokens) == 3 and len(caplog.records) == 3

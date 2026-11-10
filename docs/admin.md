@@ -153,7 +153,8 @@ Code : `pages/Studio.tsx` (+ `Studio.css`), `components/studio/` (`Pipeline`, `S
   `runBlocked` (génération bloquée, raison affichée), `confirmRun` (précise ce qui est perdu dans la confirmation, toujours demandée avant de remplacer un résultat existant),
   `approveBlocked`. Logique pure dans `steps.ts` (tests `actions.test.ts`) :
   - `availableActions(step, previousApproved)` : `canRun` si l'amont obligatoire est validé et l'étape pas `running` ;
-    `canApprove` si l'amont est validé et l'étape `awaiting_validation` ou `stale` (valider tel quel) ; `showRetry` si
+    `canApprove` si l'amont est validé et l'étape `awaiting_validation` ou `stale` (valider tel quel, sauf `RERUN_WHEN_STALE` :
+    un montage périmé se relance) ; `showRetry` si
     `failed` et relançable ; `stale`.
   - `previousApproved(steps, name)` (miroir de `can_start`, dépendances `REQUIRES`), `dependents(name)`, `hasResult(step)` (le backend crée `result = {}`),
     `statusLabel(step)` (« Facultative » / « Ignorée » pour la référence).

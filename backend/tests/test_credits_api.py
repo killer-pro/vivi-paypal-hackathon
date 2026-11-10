@@ -35,8 +35,7 @@ async def test_reset_of_unverified_account_grants_when_it_verifies(api_as, sessi
     anon, _ = await _signup(api_as, mailer)
     from tests.test_api_auth import user_by_email
     user = await user_by_email(session, "a@x.com")
-    c = await api_as(user)
-    assert (await _balance(c))["balance"]["total"] == 0
+    assert (await credits.balance(session, user.id)).total == 0
     await anon.post("/api/auth/forgot", json={"email": "a@x.com"})
     await anon.post("/api/auth/reset", json={"token": link_token(mailer.outbox[-1], "/reset"), "password": NEW_PASSWORD})
     await session.refresh(user)
@@ -46,7 +45,7 @@ async def test_reset_of_unverified_account_grants_when_it_verifies(api_as, sessi
 async def test_unverified_account_has_zero_credits(api_as, make_user, session):
     user = await make_user("u@x.fr", verified=False)
     assert await credits.grant_signup_credits(session, user, AppSettings(session)) is False
-    assert (await _balance(await api_as(user)))["balance"]["total"] == 0
+    assert (await credits.balance(session, user.id)).total == 0
 
 
 async def test_signup_grant_amount_follows_setting(api_as, make_user, session):

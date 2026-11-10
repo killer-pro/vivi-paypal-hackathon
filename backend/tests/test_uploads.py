@@ -8,8 +8,9 @@ import tempfile
 import pytest
 from sqlalchemy import func, select
 
-from app.models import Asset, AssetOriginal, Scene
+from app.models import Asset, AssetOriginal, Scene, Step
 from app.uploads import VIDEO, clean_name, upload_extension
+from tests.test_api_steps import set_status
 
 MP4 = b"\x00\x00\x00\x1cftypisom\x00\x00\x02\x00isomiso2mp41"
 
@@ -159,3 +160,60 @@ async def test_reference_upload_is_allowed_while_clips_run_but_not_while_referen
     assert (await api.post(url, files={"file": png}, data={"ref": "kroc"})).status_code == 201
     await set_running("reference")
     assert (await api.post(url, files={"file": png}, data={"ref": "kroc"})).status_code == 409
+
+
+async def test_previous_reference_version_is_restored_as_the_latest(api, session):
+    """Galerie des versions : une ancienne image redevient la dernière (celle des clips), copiée sous une nouvelle clé ;
+    la version remplacée reste. Son téléchargement porte le nom de l'élément."""
+    pid, _ = await project_with_scene(api, session)
+    url = f"/api/projects/{pid}/reference/upload"
+    first = (await api.post(url, files={"file": ("a.png", b"\x89PNG\r\n\x1a\nAAAA", "image/png")}, data={"ref": "kroc"})).json()
+    await api.post(url, files={"file": ("b.png", b"\x89PNG\r\n\x1a\nBBBB", "image/png")}, data={"ref": "kroc"})
+    r = await api.post(f"/api/projects/{pid}/reference/{first['id']}/restore")
+    assert r.status_code == 201
+    restored = await session.get(Asset, r.json()["id"])
+    assert restored.meta["ref"] == "kroc" and restored.meta["restored_from"] == first["id"]
+    assert await api.storage.get(restored.key) == b"\x89PNG\r\n\x1a\nAAAA"
+    versions = (await session.scalars(select(Asset.id).where(Asset.project_id == pid, Asset.kind == "reference"))).all()
+    assert len(versions) == 3 and max(versions) == restored.id
+    download = await api.get(f"/api/projects/{pid}/assets/{restored.id}/download")
+    assert download.headers["location"].endswith(f"?download=vivi-{pid}-kroc-{restored.id}.png")
+
+
+async def test_only_a_reference_of_the_project_can_be_restored(api, session):
+    pid, scene_id = await project_with_scene(api, session)
+    clip = (await upload_clip(api, pid, scene_id, "c.mp4")).json()
+    assert (await api.post(f"/api/projects/{pid}/reference/{clip['id']}/restore")).status_code == 404
+    assert (await api.post(f"/api/projects/{pid}/reference/99999/restore")).status_code == 404
+
+
+def wav(duration=1) -> bytes:
+    with tempfile.TemporaryDirectory() as d:
+        p = pathlib.Path(d) / "a.wav"
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", f"sine=duration={duration}", str(p)],
+                       check=True)
+        return p.read_bytes()
+
+
+async def test_imported_voice_becomes_the_scene_voice_and_makes_the_montage_stale(api, session):
+    pid, sid = await project_with_scene(api, session)
+    await set_status(session, ["montage"], "approved")
+    r = await api.post(f"/api/projects/{pid}/scenes/{sid}/upload-voice", files={"file": ("ibou 01.WAV", wav(), "x/y")})
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert body["kind"] == "voice" and body["scene_id"] == sid and body["original_name"] == "ibou 01.WAV"
+    assert body["meta"]["imported"] is True and body["meta"]["text"] == "a"
+    [key] = api.storage.files
+    assert re.fullmatch(rf"projects/{pid}/voice/[0-9a-f]{{32}}\.wav", key)
+    assert await session.scalar(select(Step.status).where(Step.project_id == pid, Step.name == "montage")) == "stale"
+
+
+async def test_imported_voice_must_be_readable_audio_of_a_scene_of_the_project(api, session):
+    pid, sid = await project_with_scene(api, session)
+    url = f"/api/projects/{pid}/scenes/{sid}/upload-voice"
+    assert (await api.post(url, files={"file": ("a.exe", b"abc", "audio/mpeg")})).status_code == 400
+    assert (await api.post(url, files={"file": ("a.mp3", b"pas du son", "audio/mpeg")})).json()["detail"] == "Fichier audio illisible"
+    other, _ = await project_with_scene(api, session)
+    assert (await api.post(f"/api/projects/{other}/scenes/{sid}/upload-voice",
+                           files={"file": ("a.wav", wav(), "audio/wav")})).status_code == 404
+    assert api.storage.files == {}

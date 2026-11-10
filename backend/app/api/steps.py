@@ -24,7 +24,7 @@ from app.services.steps import (
     stop_autopilot,
 )
 from app.services.story import MAX_KONTEXT_IMAGES, MAX_REFERENCES_TOTAL, story_result_errors
-from app.state import OPTIONAL_STEPS, InvalidTransition, dependents, transition
+from app.state import OPTIONAL_STEPS, RERUN_WHEN_STALE, InvalidTransition, dependents, transition
 
 router = APIRouter(prefix="/projects/{project_id}", tags=["steps"])
 
@@ -59,6 +59,9 @@ class RunIn(BaseModel):
     model: str | None = None
     # Générateur de l'image de départ des scènes (étape clips) pour ce lancement ; sinon réglage `start_image_provider`.
     start_image: Literal["comfyui", "gemini"] | None = None
+    # Clips : chaque scène repart de l'image de départ de son clip choisi, sans nouvelle composition (changer de modèle
+    # vidéo ou lip-sync en gardant l'image validée, sans repayer Kontext). Faute d'image gardée, composition habituelle.
+    reuse_start_image: bool = False
     # Reprise d'une étape par scène en échec : seules les scènes manquantes sont générées (clips, voix).
     resume: bool = False
     # Étape par scène, quel que soit son état : ne génère que les scènes qui n'ont encore aucun clip / aucune voix.
@@ -75,7 +78,8 @@ class RunIn(BaseModel):
     def overrides(self) -> dict:
         return {k: v for k, v in (("provider", self.provider), ("model", self.model),
                                   ("instruction", self.instruction), ("reference_id", self.reference_id),
-                                  ("start_image", self.start_image)) if v}
+                                  ("start_image", self.start_image), ("reuse_start_image", self.reuse_start_image))
+                if v}
 
 
 class SelectClipIn(BaseModel):
@@ -92,9 +96,13 @@ class SceneContinuityIn(BaseModel):
     continuity: Literal["cut", "continue"]
 
 
+class SceneLipsyncIn(BaseModel):
+    lipsync: bool
+
+
 class ReferenceElementIn(BaseModel):
     name: NonBlank = Field(max_length=60)  # « Ouvrier de l'Égypte ancienne » → id `ouvrier_de_l_gypte_ancienne`
-    prompt: NonBlank = Field(max_length=MAX_VISUAL_PROMPT_CHARS)
+    prompt: str = Field("", max_length=MAX_VISUAL_PROMPT_CHARS)  # vide : élément ajouté avec une image importée
     # Élément de l'histoire promu en référence : garde son id (celui des scènes) et son descripteur.
     story_id: Annotated[str, StringConstraints(pattern=r"^[a-z0-9_-]{1,30}$")] | None = None
 
@@ -153,6 +161,8 @@ def _check_run_options(name: str, body: RunIn) -> None:
     """422 si une option du lancement ne s'applique pas à l'étape (partagé par le lancement et le prix)."""
     if (body.provider or body.model) and name != "clips":
         raise HTTPException(422, "Provider et modèle ne se choisissent au lancement que pour l'étape clips")
+    if body.reuse_start_image and name != "clips":
+        raise HTTPException(422, "La reprise de l'image de départ ne s'applique qu'à l'étape clips")
     if body.start_image and name != "clips":
         raise HTTPException(422, "Le générateur d'image de départ ne se choisit qu'au lancement de l'étape clips")
     if body.instruction and name not in ("story", "script"):
@@ -218,11 +228,17 @@ async def approve(project_id: int, name: str, session: AsyncSession = Depends(ge
     steps, step = await steps_and_step(session, project_id, name)
     if name in OPTIONAL_STEPS and step.status == "pending":
         step.status = "approved"  # étape optionnelle ignorée (hors machine à états)
+    elif name in RERUN_WHEN_STALE and step.status == "stale":
+        raise HTTPException(409, "Le montage ne correspond plus aux clips ou voix choisis : relancez-le avant de le valider")
     else:
         try:
             step.status = transition(step.status, "approved")
         except InvalidTransition:
             raise HTTPException(409, f"Validation impossible depuis le statut « {step.status} »") from None
+    if name == "clips":  # les références n'ont pas de bouton « Valider » : les clips qui s'en servent les entérinent
+        reference = next(s for s in steps if s.name == "reference")
+        if reference.status in ("awaiting_validation", "stale"):
+            reference.status = "approved"
     await sync_status(session, project_id, steps)
     await session.commit()
     result = fields(step, STEP_FIELDS)
@@ -273,7 +289,7 @@ async def add_reference_element(project_id: int, body: ReferenceElementIn, sessi
     if len(elements) >= MAX_REFERENCES_TOTAL:
         raise HTTPException(409, f"{MAX_REFERENCES_TOTAL} éléments au plus")
     descriptor = (story_element or {}).get("descriptor")
-    element = {"id": rid, "prompt": body.prompt, **({"descriptor": descriptor} if descriptor else {})}
+    element = {"id": rid, "prompt": body.prompt.strip() or body.name, **({"descriptor": descriptor} if descriptor else {})}
     script.result = {**script.result, "references": [*elements, element]}
     await session.commit()
     return element
@@ -336,6 +352,19 @@ async def set_scene_continuity(project_id: int, scene_id: int, body: SceneContin
             await session.scalars(select(Scene.position).where(Scene.project_id == project_id))):
         raise HTTPException(422, "La première scène n'a pas de scène précédente")
     scene.continuity = body.continuity
+    await session.commit()
+    return fields(scene, SCENE_FIELDS)
+
+
+@router.put("/scenes/{scene_id}/lipsync")
+async def set_scene_lipsync(project_id: int, scene_id: int, body: SceneLipsyncIn,
+                            session: AsyncSession = Depends(get_session)) -> dict:
+    """Avatar parlant : `false` sort la scène du lip-sync (clip animé ordinaire, voix hors champ) même si le personnage qui
+    parle y est visible. Le clip déjà produit n'est pas touché : il faut le régénérer."""
+    scene = await session.get(Scene, scene_id)
+    if scene is None or scene.project_id != project_id:
+        raise HTTPException(404, "Scène introuvable")
+    scene.lipsync = body.lipsync
     await session.commit()
     return fields(scene, SCENE_FIELDS)
 

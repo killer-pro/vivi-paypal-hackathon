@@ -9,7 +9,7 @@ import pytest
 from app.providers.base import Availability, ProviderError, plain_prompt, split_prompt
 from app.providers.claude import PRICE_IN_PER_M, PRICE_OUT_PER_M, ClaudeLLM
 from app.providers.comfyui import AVAILABILITY_TIMEOUT_S, MISSING_POLLS, ComfyUIImage, ComfyUIProvider, frames_for
-from app.providers.elevenlabs import ElevenLabsVoice
+from app.providers.elevenlabs import MODEL_ID, TAGGED_MODEL_ID, ElevenLabsVoice, spoken
 from app.providers.fal import FAL_KEY_MISSING, FalProvider
 from app.providers.profiles import PROFILES, flux_files, required_files
 
@@ -515,6 +515,20 @@ async def test_elevenlabs_returns_audio_and_cost():
 
     r = await ElevenLabsVoice("k", client(handler)).synthesize("bonjour", voice_id="v1")
     assert r.data == b"MP3" and r.cost_usd > 0
+
+
+@pytest.mark.parametrize("text,model", [("[excited] Bonjour !", TAGGED_MODEL_ID),
+                                        ("Bonjour !", MODEL_ID)])
+async def test_elevenlabs_plays_emotion_tags_with_v3(text, model):
+    def handler(req: httpx.Request):
+        assert json.loads(req.content)["model_id"] == model
+        return httpx.Response(200, content=b"MP3")
+
+    assert (await ElevenLabsVoice("k", client(handler)).synthesize(text, voice_id="v")).model == model
+
+
+def test_emotion_tags_are_neither_subtitled_nor_counted():
+    assert spoken("[excited]  C'est arrivé ! [laughs] Enfin.") == "C'est arrivé ! Enfin."
 
 
 async def test_elevenlabs_429_is_retryable():

@@ -436,7 +436,12 @@ async def run_clips_and_voice(session, ctx, p):
         assert (await get_step(session, p.id, name)).status == "awaiting_validation"
 
 
-async def test_montage_end_to_end_with_fakes(session, ctx):
+async def test_montage_end_to_end_with_fakes(session, ctx, monkeypatch):
+    from app.services import montage
+
+    levels = []
+    assemble = montage.assemble
+    monkeypatch.setattr(montage, "assemble", lambda *a, **kw: levels.append(a[5]) or assemble(*a, **kw))
     p = await seed(session)
     s = Scene(project_id=p.id, position=1, voice_text="Bonjour tout le monde", visual_prompt="b", duration_s=3)
     session.add(s)
@@ -449,7 +454,7 @@ async def test_montage_end_to_end_with_fakes(session, ctx):
     track = MusicTrack(name="beat", key="music/beat.mp3")
     session.add(track)
     await session.flush()
-    await set_running(session, "music", params={"track_id": track.id})
+    await set_running(session, "music", params={"track_id": track.id, "volume": 40})
     await run_step(ctx, p.id, "music")
     await set_running(session, "montage")
     await run_step(ctx, p.id, "montage")
@@ -458,6 +463,7 @@ async def test_montage_end_to_end_with_fakes(session, ctx):
     render = await session.scalar(select(Asset).where(Asset.kind == "render"))
     assert render is not None and len(ctx.storage.files[render.key]) > 0
     assert step.result["asset_id"] == render.id and step.result["duration_s"] > 0
+    assert levels == [0.4]  # volume de l'étape musique, en %
 
 
 async def test_montage_fails_when_scene_has_no_selected_clip(session, ctx):

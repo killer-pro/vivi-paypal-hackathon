@@ -11,6 +11,7 @@ from app.services.montage import (
     SceneInput,
     build_ass,
     clip_filter,
+    music_level,
     probe_duration,
     probe_fps,
     render,
@@ -26,6 +27,12 @@ def test_build_ass_uses_real_pixels_and_sanitizes():
     assert f"PlayResX: {WIDTH}\nPlayResY: {HEIGHT}\n" in ass  # tailles et marges en pixels 1080x1920
     assert "Dialogue: 0,0:00:00.00,0:00:02.00,Default,,0,0,0,,Salut \"toi\" (/b1)🚀\n" in ass
     assert "Dialogue: 0,0:00:02.00,0:00:03.50,Default,,0,0,0,,Fin\n" in ass
+
+
+def test_build_ass_replaces_dashes_missing_from_the_font():
+    # tirets insécables écrits par le LLM (« micro‑objectif ») : absents de la police, affichés en carré vide
+    ass = build_ass([("un micro\u2011objectif, mi\u2010temps", 1.0)])
+    assert ",,un micro-objectif, mi-temps\n" in ass
 
 
 def test_build_ass_subtitle_styles():
@@ -163,7 +170,7 @@ async def test_render_segment_then_assemble_equals_render(tmp_path):
     assert abs(total - 4.6) < 0.1 and abs(await probe_duration(tmp_path / "o.mp4") - total) < 0.3
 
 
-@pytest.mark.parametrize("style", ["classic", "box", "bold"])
+@pytest.mark.parametrize("style", ["classic", "box", "bold", "none"])
 async def test_assemble_burns_each_subtitle_style(tmp_path, style):
     from app.services.montage import assemble, render_segment
 
@@ -174,6 +181,53 @@ async def test_assemble_burns_each_subtitle_style(tmp_path, style):
     out = tmp_path / f"{style}.mp4"
     await assemble([segment], None, out, tmp_path / "w", style)
     assert out.stat().st_size > 0
+
+
+@pytest.mark.parametrize(("percent", "level"), [(None, 0.15), (40, 0.4), ("25", 0.25), (0, 0.0), (250, 1.0), (-5, 0.0),
+                                               ("fort", 0.15), (float("nan"), 0.15)])
+def test_music_level_reads_the_volume_percent_of_the_music_step(percent, level):
+    assert music_level(percent) == level
+
+
+async def test_music_volume_sets_the_music_level_under_the_voice(tmp_path):
+    """Voix à 300 Hz, musique à 4 kHz : le pic au-dessus de 2 kHz ne mesure que la musique."""
+    from app.services.montage import assemble, render_segment
+
+    clip, voice, music = tmp_path / "c.mp4", tmp_path / "v.wav", tmp_path / "m.wav"
+    mk(clip, "-f", "lavfi", "-i", "color=c=red:s=320x568:d=1:r=30", "-pix_fmt", "yuv420p")
+    mk(voice, "-f", "lavfi", "-i", "sine=frequency=300:duration=1")
+    mk(music, "-f", "lavfi", "-i", "sine=frequency=4000:duration=3")
+    segment = await render_segment(SceneInput(clip, voice, "x"), tmp_path / "seg", "s")
+
+    async def music_peak(volume: float) -> float:
+        out = tmp_path / f"{volume}.mp4"
+        await assemble([segment], music, out, tmp_path / f"w{volume}", music_volume=volume)
+        log = subprocess.run(["ffmpeg", "-i", str(out), "-af", "highpass=f=2000:poles=2,highpass=f=2000:poles=2,volumedetect",
+                              "-f", "null", "-"], capture_output=True, text=True, check=True).stderr
+        return float(re.search(r"max_volume: (\S+) dB", log).group(1))
+
+    low, high = await music_peak(0.05), await music_peak(0.6)
+    assert high - low > 15  # ×12 en amplitude ≈ +21,6 dB (la voix, identique, fixe la normalisation)
+
+
+async def test_no_subtitles_style_burns_no_text(tmp_path):
+    """Style « none » : la zone des sous-titres garde la couleur du clip (aucun pixel blanc du texte)."""
+    from app.services.montage import assemble, render_segment
+
+    clip, voice = tmp_path / "c.mp4", tmp_path / "v.mp3"
+    mk(clip, "-f", "lavfi", "-i", "color=c=blue:s=320x568:d=1:r=30", "-pix_fmt", "yuv420p")
+    mk(voice, "-f", "lavfi", "-i", "sine=frequency=300:duration=1")
+    segment = await render_segment(SceneInput(clip, voice, "TEXTE BIEN VISIBLE"), tmp_path / "seg", "s")
+
+    async def brightest(style: str) -> int:
+        out = tmp_path / f"{style}.mp4"
+        await assemble([segment], None, out, tmp_path / f"w{style}", style)
+        gray = subprocess.run(["ffmpeg", "-v", "error", "-ss", "0.5", "-i", str(out), "-frames:v", "1", "-vf",
+                               f"crop={WIDTH}:300:0:{HEIGHT - 700},format=gray", "-f", "rawvideo", "-"],
+                              capture_output=True, check=True).stdout
+        return max(gray)
+
+    assert await brightest("classic") > 200 and await brightest("none") < 100
 
 
 async def test_render_holds_the_last_frame_of_a_clip_shorter_than_the_voice(tmp_path):

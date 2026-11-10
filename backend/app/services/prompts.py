@@ -48,6 +48,20 @@ ENGAGEMENT_RULE = (
 )
 
 
+# Avatar parlant (`Project.lipsync`) : un personnage dit lui-même sa voix off face caméra, sa bouche animée en lip-sync.
+AUDIO_TAGS_RULE = ("Seule exception : une balise d'émotion ElevenLabs en anglais entre crochets ([excited], [laughs], "
+                   "[whispers], [sighs], [surprised]) peut précéder une phrase pour la faire jouer ; elle n'est ni dite "
+                   "ni sous-titrée, une ou deux par scène au plus")
+LIPSYNC_INVENTORY = (
+    "Mode avatar parlant : un personnage s'adresse au spectateur face caméra. Dans chaque beat où il parle, `speaker` "
+    "vaut son id et il fait partie des éléments visibles du beat ; il n'est pas visible quand un autre parle.\n")
+LIPSYNC_SCENE = (
+    "{name} prononce la voix off de cette scène face caméra (sa bouche sera animée sur la voix) : cadre-le en plan "
+    "taille, mains et décor visibles, visage de face, bien éclairé et net, bouche visible, regard caméra. Le paragraphe "
+    "Motion décrit qu'il parle au spectateur avec une émotion nette (enthousiasme, surprise, complicité) et des gestes "
+    "de mains amples, caméra lente (léger travelling ou panoramique).\n")
+
+
 def project_brief(project: Project) -> str:
     return (f"Thème : {project.theme}\nPlateforme : {project.platform}\n"
             f"Durée totale cible : {project.target_duration_s} secondes")
@@ -97,7 +111,7 @@ def script_prompt(project: Project, angle: str, scene_length_s: float | None = N
             f"Voix off en français, au débit d'environ {rate} mots par seconde : "
             f"environ {word_budget(target)} mots au total, et pour chaque scène environ "
             f"{rate} × duration_s mots (ex. {word_budget(4)} mots pour 4 s). "
-            "voice_text ne contient que le texte prononcé (ni didascalie, ni markdown, ni numéro de scène). "
+            f"voice_text ne contient que le texte prononcé (ni didascalie, ni markdown, ni numéro de scène). {AUDIO_TAGS_RULE} "
             "La première scène est l'accroche : une phrase choc ou une question qui retient le spectateur dès les 2 "
             f"premières secondes. {ENGAGEMENT_RULE}.\n"
             f"visual_prompt est en anglais, pour un générateur texte-vers-vidéo : {VISUAL_PROMPT_GUIDE}.\n"
@@ -128,7 +142,7 @@ def story_prompt(project: Project, angle: str, scene_length_s: float | None = No
             f"doit faire {target} secondes (à 10 % près).\n"
             "Chaque beat a `summary` (1 à 2 phrases en français : qui fait quoi, quel objet est touché et ce qui change "
             "pour lui), `voice_text` (voix off en français, texte prononcé seulement, au débit d'environ "
-            f"{rate} mots par seconde, soit {word_budget(4)} mots pour 4 s), `duration_s` et `continuity` : « continue » "
+            f"{rate} mots par seconde, soit {word_budget(4)} mots pour 4 s ; {AUDIO_TAGS_RULE}), `duration_s` et `continuity` : « continue » "
             "si le beat se passe au même endroit, dans la suite immédiate du précédent (la caméra change de cadrage mais "
             "l'action et le décor continuent), « cut » pour un changement de lieu ou une ellipse ; le premier beat est "
             "toujours « cut ».\n"
@@ -159,6 +173,8 @@ def inventory_prompt(project: Project, beats: list[dict]) -> str:
             "ne change. L'état change quand un événement le modifie et ne revient jamais en arrière sans événement. Tout accessoire est visible dans au moins deux beats, ou dans l'un des deux derniers. Chaque beat a aussi "
             "`speaker` : l'id du personnage qui prononce la voix off de ce beat quand c'est sa réplique ou sa pensée à la "
             "première personne, sinon vide (le narrateur) ; la plupart des beats d'une voix off racontée restent vides.\n"
+            + (LIPSYNC_INVENTORY if project.lipsync else "")
+            + 
             'Réponds avec {"bible": "...", "elements": [{"id": "sac", "kind": "prop", "name": "...", "descriptor": "...", '
             '"prompt": "..."}], "beats": [{"elements": [{"id": "sac", "state": "dry"}], "speaker": ""}]}.')
 
@@ -181,6 +197,8 @@ def scene_prompt(project: Project, bible: str, beat: dict, present: list[dict], 
             + (f"Scène précédente : {previous} Cette scène continue la même action avec un autre cadrage.\n" if previous else "")
             + (f"Éléments visibles, avec leur apparence figée et leur état (reprends chaque descripteur mot pour mot, "
                f"état compris) :\n{looks}\n" if looks else "")
+            + (LIPSYNC_SCENE.format(name=next(e["name"] for e in present if e["id"] == beat.get("speaker")))
+               if project.lipsync and any(e["id"] == beat.get("speaker") for e in present) else "")
             + f"visual_prompt est en anglais, pour un générateur texte-vers-vidéo : {VISUAL_PROMPT_GUIDE}.\n"
             'Réponds avec {"visual_prompt": "..."}.')
 

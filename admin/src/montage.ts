@@ -33,3 +33,12 @@ export function sceneTiming(voiceS: number | undefined, clipS: number | undefine
   const { duration, tempo, stretch } = converge(voiceS, clipS);
   return { duration: duration + PAD_S, tempo, rate: 1 / stretch };
 }
+
+/** Volume de la musique sous la voix par défaut, en % (`MUSIC_VOLUME`, `backend/app/services/montage.py`). */
+export const DEFAULT_MUSIC_VOLUME = 15;
+
+/** Volume de la musique (paramètre `volume` de l'étape musique, en %, borné à 0-100), comme `music_level` au montage. */
+export function musicVolume(params: Record<string, unknown> | undefined): number {
+  const value = Number(params?.volume ?? DEFAULT_MUSIC_VOLUME);
+  return Number.isFinite(value) ? clamp(value, 0, 100) : DEFAULT_MUSIC_VOLUME;
+}

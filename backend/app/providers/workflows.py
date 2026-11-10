@@ -1,8 +1,10 @@
 """Workflows ComfyUI (format API) paramétrés par profil : un JSON par type de graphe, jamais une copie par profil."""
 import json
+import math
+from collections.abc import Mapping
 from pathlib import Path
 
-from app.providers.profiles import Profile
+from app.providers.profiles import TALK_MODELS, Profile
 
 WORKFLOWS_DIR = Path(__file__).resolve().parents[2] / "workflows"
 ESRGAN_MODEL = "ESRGAN/4x-UltraSharp.pth"
@@ -13,14 +15,15 @@ VIDEO_COMBINE_NODE = "18"
 PLAIN_SHARE = 0.5
 
 
-def _load(name: str, numbers: dict[str, int], prompt: str, image: str | None = None) -> dict:
+def _load(name: str, numbers: Mapping[str, float], prompt: str, image: str | None = None, audio: str | None = None) -> dict:
     """Charge `comfyui-<name>.json` et remplace les marqueurs. Le prompt (texte libre) est inséré en dernier : un
     « {{SEED}} » qu'il contiendrait reste littéral."""
     raw = (WORKFLOWS_DIR / f"comfyui-{name}.json").read_text(encoding="utf-8")
     for key, value in numbers.items():
         raw = raw.replace(f'"{{{{{key}}}}}"', str(value))
-    if image is not None:
-        raw = raw.replace("{{IMAGE}}", json.dumps(image)[1:-1])
+    for marker, file in (("{{IMAGE}}", image), ("{{AUDIO}}", audio)):
+        if file is not None:
+            raw = raw.replace(marker, json.dumps(file)[1:-1])
     return json.loads(raw.replace("{{PROMPT}}", json.dumps(prompt)[1:-1]))
 
 
@@ -68,6 +71,24 @@ def i2v_workflow(profile: Profile, prompt: str, seed: int, frames: int, image_na
 def keyframe_workflow(prompt: str, seed: int) -> dict:
     """Image Flux dev, taille fixe 576×1008 (celle de l'I2V dépend du profil, pas celle-ci)."""
     return _load("flux-keyframe", {"SEED": seed}, prompt)
+
+
+# Avatar parlant : taille de sortie des graphes (LTX travaille en 704×1280, les autres en 480×832) ; le montage recadre en
+# 9:16. Une seule passe couvre la voix : testé jusqu'à 8 s sans dérive du visage (2026-11-09).
+TALK_SIZES = {"s2v": (480, 832), "infinitetalk": (480, 832), "ltx": (704, 1280)}
+
+
+def talk_frames(model: str, duration_s: float) -> int:
+    """Nombre d'images (4n + 1, contrainte des VAE Wan) qui couvre `duration_s` à la cadence du modèle."""
+    return 4 * math.ceil(round(duration_s * TALK_MODELS[model].fps - 1, 6) / 4) + 1
+
+
+def talk_workflow(model: str, prompt: str, seed: int, duration_s: float, image_name: str, audio_name: str) -> dict:
+    """Vidéo d'un personnage qui dit la voix `audio_name`, à partir de l'image `image_name` (format `TALK_MODELS`)."""
+    width, height = TALK_SIZES[model]
+    numbers = {"WIDTH": width, "HEIGHT": height, "SEED": seed, "FRAMES": talk_frames(model, duration_s),
+               "DURATION": round(duration_s, 2)}
+    return _load(f"talk-{model}", numbers, prompt, image_name, audio_name)
 
 
 KONTEXT_TEXT_NODE, KONTEXT_FIRST_LATENT_NODE, KONTEXT_SCALE_NODE, KONTEXT_GUIDANCE_NODE = "7", "8", "5", "9"

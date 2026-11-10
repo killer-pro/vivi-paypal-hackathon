@@ -1,0 +1,319 @@
+{
+  "13": {
+    "inputs": {
+      "unet_name": "Wan2_1-I2V-14B-480p_fp8_e4m3fn_scaled_KJ.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Charger Modèle Diffusion"
+    }
+  },
+  "14": {
+    "inputs": {
+      "text": "{{PROMPT}}",
+      "clip": [
+        "16",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "16": {
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Charger CLIP"
+    }
+  },
+  "17": {
+    "inputs": {
+      "conditioning": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "24": {
+    "inputs": {
+      "audio": "{{AUDIO}}"
+    },
+    "class_type": "LoadAudio",
+    "_meta": {
+      "title": "ChargerAudio"
+    }
+  },
+  "25": {
+    "inputs": {
+      "audio_encoder": [
+        "26",
+        0
+      ],
+      "audio": [
+        "24",
+        0
+      ]
+    },
+    "class_type": "AudioEncoderEncode",
+    "_meta": {
+      "title": "EncodeurAudioEncoder"
+    }
+  },
+  "26": {
+    "inputs": {
+      "audio_encoder_name": "wav2vec2-chinese-base_fp16.safetensors"
+    },
+    "class_type": "AudioEncoderLoader",
+    "_meta": {
+      "title": "ChargeurEncodeurAudio"
+    }
+  },
+  "29": {
+    "inputs": {
+      "vae_name": "Wan2_1_VAE_bf16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Charger VAE"
+    }
+  },
+  "32": {
+    "inputs": {
+      "image": "{{IMAGE}}"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Charger Image"
+    }
+  },
+  "33": {
+    "inputs": {
+      "lora_name": "lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors",
+      "strength_model": 1,
+      "model": [
+        "13",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "LoraLoaderModelOnly"
+    }
+  },
+  "112": {
+    "inputs": {
+      "name": "wan2.1_infiniteTalk_single_fp16.safetensors"
+    },
+    "class_type": "ModelPatchLoader",
+    "_meta": {
+      "title": "ModelPatchLoader"
+    }
+  },
+  "119": {
+    "inputs": {
+      "samples": [
+        "145:120",
+        0
+      ],
+      "vae": [
+        "29",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "129": {
+    "inputs": {
+      "mode": "single_speaker",
+      "width": [
+        "149",
+        0
+      ],
+      "height": [
+        "150",
+        0
+      ],
+      "length": "{{FRAMES}}",
+      "motion_frame_count": 9,
+      "audio_scale": 1,
+      "model": [
+        "33",
+        0
+      ],
+      "model_patch": [
+        "112",
+        0
+      ],
+      "positive": [
+        "14",
+        0
+      ],
+      "negative": [
+        "17",
+        0
+      ],
+      "vae": [
+        "29",
+        0
+      ],
+      "audio_encoder_output_1": [
+        "25",
+        0
+      ],
+      "start_image": [
+        "32",
+        0
+      ]
+    },
+    "class_type": "WanInfiniteTalkToVideo",
+    "_meta": {
+      "title": "WanInfiniteTalkToVideo"
+    }
+  },
+  "138": {
+    "inputs": {
+      "fps": 25,
+      "images": [
+        "119",
+        0
+      ],
+      "audio": [
+        "24",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Créer une vidéo"
+    }
+  },
+  "149": {
+    "inputs": {
+      "value": "{{WIDTH}}"
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Width"
+    }
+  },
+  "150": {
+    "inputs": {
+      "value": "{{HEIGHT}}"
+    },
+    "class_type": "PrimitiveInt",
+    "_meta": {
+      "title": "Height"
+    }
+  },
+  "162": {
+    "inputs": {
+      "filename_prefix": "video/vivi_talk",
+      "format": "auto",
+      "codec": "auto",
+      "video": [
+        "138",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Enregistrer la vidéo"
+    }
+  },
+  "145:108": {
+    "inputs": {
+      "sampler_name": "euler"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "145:107": {
+    "inputs": {
+      "cfg": 1,
+      "model": [
+        "129",
+        0
+      ],
+      "positive": [
+        "129",
+        1
+      ],
+      "negative": [
+        "129",
+        2
+      ]
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "GuideCFG"
+    }
+  },
+  "145:19": {
+    "inputs": {
+      "scheduler": "normal",
+      "steps": 4,
+      "denoise": 1,
+      "model": [
+        "129",
+        0
+      ]
+    },
+    "class_type": "BasicScheduler",
+    "_meta": {
+      "title": "PlanificateurBasique"
+    }
+  },
+  "145:106": {
+    "inputs": {
+      "noise_seed": "{{SEED}}"
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "BruitAléatoire"
+    }
+  },
+  "145:120": {
+    "inputs": {
+      "noise": [
+        "145:106",
+        0
+      ],
+      "guider": [
+        "145:107",
+        0
+      ],
+      "sampler": [
+        "145:108",
+        0
+      ],
+      "sigmas": [
+        "145:19",
+        0
+      ],
+      "latent_image": [
+        "129",
+        3
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "ÉchantillonneurPersonnaliséAvancé"
+    }
+  }
+}

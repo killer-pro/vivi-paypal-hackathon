@@ -213,6 +213,27 @@ async def test_select_clip_marks_montage_and_final_stale_only(api, session):
     assert {status[n] for n in ("idea", "story", "script", "clips", "voice", "music")} == {"approved"}
 
 
+async def test_stale_montage_must_be_rerun_before_approval(api, session):
+    """Un montage périmé est une vidéo bâtie sur d'anciens clips (ou voix) : le valider tel quel exporterait l'ancien rendu."""
+    pid = await new_project(api)
+    url, clip = await scene_with_clip(session, pid)
+    await set_status(session, ["idea", "story", "script", "clips", "voice", "music", "montage"], "approved")
+    assert (await api.post(url, json={"asset_id": clip.id})).status_code == 200
+    r = await api.post(f"/api/projects/{pid}/steps/montage/approve")
+    assert r.status_code == 409 and "relancez" in r.json()["detail"]
+    assert (await statuses(api, pid))["montage"] == "stale"
+
+
+async def test_approving_clips_approves_the_reference_images_awaiting_review(api, session):
+    """L'étape facultative des références n'a pas de bouton « Valider » : valider les clips, qui s'en servent, la valide."""
+    pid = await new_project(api)
+    await set_status(session, ["idea", "story", "script"], "approved")
+    await set_status(session, ["reference", "clips"], "awaiting_validation")
+    assert (await api.post(f"/api/projects/{pid}/steps/clips/approve")).status_code == 200
+    status = await statuses(api, pid)
+    assert status["reference"] == "approved" and status["clips"] == "approved"
+
+
 @pytest.mark.parametrize("running", ["clips", "montage"])
 async def test_select_clip_while_generating_is_409(api, session, running):
     pid = await new_project(api)
@@ -630,6 +651,8 @@ async def test_reference_element_is_added_to_the_script_without_staling_anything
     assert script["result"]["bible"] == "b" and script["status"] == "approved"
     assert (await api.post(url, json=body)).status_code == 409  # doublon
     assert (await api.post(url, json={"name": "!!!", "prompt": "x"})).status_code == 422
+    # Élément ajouté avec une image importée, sans description : son nom sert de prompt pour une régénération.
+    assert (await api.post(url, json={"name": "Ibou"})).json() == {"id": "ibou", "prompt": "Ibou"}
 
 
 async def test_story_element_is_promoted_to_a_reference_with_its_id_and_descriptor(api, session):
@@ -849,6 +872,7 @@ async def test_start_image_choice_is_a_clips_launch_override_only(api, session):
     await set_status(session, ["idea", "story", "script"], "approved")
     assert (await api.post(f"/api/projects/{pid}/steps/voice/run", json={"start_image": "gemini"})).status_code == 422
     assert (await api.post(f"/api/projects/{pid}/steps/clips/run", json={"start_image": "dalle"})).status_code == 422
+    assert (await api.post(f"/api/projects/{pid}/steps/voice/run", json={"reuse_start_image": True})).status_code == 422
     assert api.enqueued == []
     body = {"scene_id": 7, "start_image": "gemini"}
     assert (await api.post(f"/api/projects/{pid}/steps/clips/run", json=body)).status_code == 202

@@ -30,7 +30,7 @@ import { useMediaQuery } from "../hooks/useMediaQuery";
 import { usePanelLayout } from "../hooks/usePanelLayout";
 import { useMediaDurations } from "../hooks/useMediaDurations";
 import { usePlayer } from "../hooks/usePlayer";
-import { sceneTiming } from "../montage";
+import { musicVolume, sceneTiming } from "../montage";
 import { useProject, type Flow } from "../hooks/useProject";
 import { needsPlanScreen } from "../planChat";
 import { currentStep, previousApproved, runningDownstream, type StepName } from "../steps";
@@ -131,6 +131,7 @@ function Studio({ id }: { id: number }) {
     clip: clip?.url,
     voice: voice?.url,
     music: track?.url,
+    musicVolume: musicVolume(musicStep?.params) / 100,
     blocks,
     timings,
     total,
@@ -365,6 +366,7 @@ function Studio({ id }: { id: number }) {
         voice={voice?.url}
         music={track?.url}
         scene={scene}
+        subtitles={project.steps.find((s) => s.name === "montage")?.params.subtitle_style !== "none"}
         total={total}
         onEditClip={editClip}
         onEditVoice={() => openStep("voice")}

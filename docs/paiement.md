@@ -27,7 +27,7 @@ localhost:8000/api/stripe/webhook`. Activer le portail client dans le tableau de
 2. `POST /api/billing/checkout {kind: "subscription" | "topup", tier_id?, pack_id?}` → `{url}` de la page de paiement
    (`tier_id` : forfait, exigé pour un abonnement, recopié dans les métadonnées de l'abonnement Stripe pour que `invoice.paid`
    retrouve le forfait ; à défaut, le premier). Le client Stripe
-   du compte est créé au premier achat (`users.stripe_customer_id`). Refus : `403` adresse non vérifiée, `404` recharge
+   du compte est créé au premier achat (`users.stripe_customer_id`). Refus : `404` recharge
    ou forfait inconnu, `422` forfait manquant, `409` offre sans prix Stripe ou compte déjà abonné (aller au portail), `502` refus de Stripe (message affiché).
    Retour : `/plans?checkout=success|cancelled`.
 3. `POST /api/billing/portal` → `{url}` du portail du **compte connecté** seulement (`409` sans achat).
@@ -78,7 +78,7 @@ scripts/paypal_create_plan.py --tier starter` (puis `creator`, `pro`) crée le p
 et inscrit `paypal_plan_id` dans ce forfait de `billing_config` (vide : pas d'abonnement PayPal à ce forfait). `users.paypal_subscription_id` (migration `0019`) garde l'abonnement en cours du compte.
 
 Parcours : `POST /api/billing/paypal/subscription {tier_id}` crée l'abonnement au plan du forfait (`custom_id` = identifiant du compte) et
-renvoie l'URL d'approbation (`403` adresse non vérifiée, `404` forfait inconnu, `409` forfait sans plan PayPal ou compte déjà abonné,
+renvoie l'URL d'approbation (`404` forfait inconnu, `409` forfait sans plan PayPal ou compte déjà abonné,
 `502` refus de PayPal) ; PayPal renvoie sur
 `/plans?paypal_sub=success&subscription_id=…` ; l'écran appelle `POST /api/billing/paypal/subscription/confirm`, qui **relit l'abonnement chez
 PayPal** (jamais le corps d'un événement), vérifie qu'il est au compte connecté (`403` sinon) et, si au moins un mois est prélevé

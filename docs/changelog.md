@@ -1,5 +1,40 @@
 # Changelog
 
+## 2026-11-10 (tirets dans les sous-titres)
+- Sous-titres gravés : les tirets insécables (U+2011) et U+2010 écrits par le LLM deviennent des tirets simples ; ils s'affichaient en carré vide (« micro□objectif »). Doc : `montage.md`.
+
+## 2026-11-10 (reprise de l'image de départ)
+- Lancement des clips avec `reuse_start_image` : chaque scène repart de l'image de départ de son clip choisi, sans nouvelle composition Kontext (changer de modèle lip-sync ou vidéo en gardant l'image validée). Doc : `api.md`, `avatar-parlant.md`.
+
+## 2026-11-10 (vidéo sans sous-titres)
+- Style de sous-titres « Sans » (`subtitle_style = none`) dans le panneau Montage : aucun texte gravé, ni dans l'aperçu. Pour les voix enregistrées dont le texte diffère du script. Doc : `montage.md`.
+
+## 2026-11-09 (voix importées)
+- Import d'une voix enregistrée par scène (étape Voix, `POST …/scenes/{id}/upload-voice`) : gardée par « Générer les voix », prononcée par l'avatar parlant, sans voix ElevenLabs requise. Pour les langues que la synthèse ne parle pas (wolof). Doc : `voix-importees.md`, `api.md`, `avatar-parlant.md`.
+
+## 2026-11-09 (volume de la musique)
+- Volume de la musique réglable dans l'éditeur : curseur « Volume sous la voix » du panneau Musique (0 à 100 %, défaut 15 %), paramètre `volume` de l'étape musique, appliqué au montage (`music_level`, `assemble(music_volume=…)`) et à l'aperçu. Doc : `montage.md`, `music.md`.
+
+## 2026-11-09 (versions des images de référence)
+- Galerie des versions de l'image d'un élément (étape Clips → Image de référence) : une régénération ne fait plus perdre l'image précédente, « Utiliser » la remet (`POST …/reference/{asset_id}/restore`), « Télécharger » enregistre chaque version (`vivi-{id}-{élément}-{version}.png`). « Ajouter un élément » accepte une image importée sans description. Doc : `references.md`, `api.md`.
+
+## 2026-11-09 (retouche d'un clip lip-sync)
+- Import d'une retouche d'un clip lip-sync (`upload-clip` avec `retouches`, case dans l'étape Clips) : la variante garde la voix calée du clip d'origine et se monte sans changement de vitesse. Sert aux écrans d'application incrustés et aux coupes franches entre plans. Doc : `avatar-parlant.md`, `api.md`.
+
+## 2026-11-09 (voix expressives)
+- Balises d'émotion ElevenLabs dans les textes de voix (`[excited]`, `[laughs]`, `[whispers]`…) : synthèse avec `eleven_v3`, balises retirées des sous-titres et du compte de mots ; le script peut en proposer. L'avatar parlant est cadré en plan taille avec gestes et émotion, plus en gros plan fixe. Doc : `providers.md`, `avatar-parlant.md`.
+
+## 2026-11-09 (avatar parlant)
+- Case « Parle face caméra » par scène (migration `0022`, `PUT …/scenes/{id}/lipsync`) : une scène où le personnage est visible peut redevenir un clip animé, avec sa voix hors champ.
+- Mode « Avatar parlant » par projet (migration `0021`) : chaque scène où le personnage qui parle est visible est générée en lip-sync sur Comfy Cloud, à partir de sa voix. Trois modèles au choix dans Réglages (`lipsync_model` : Wan 2.2 S2V par défaut, InfiniteTalk, LTX-2.3). Le montage garde cette voix sans changer de vitesse. Les voix enregistrent leur texte et leur voix pour être réutilisées. Le script cadre ces scènes face caméra. Doc : `avatar-parlant.md`, `workflow-video.md`, `providers.md`.
+
+## 2026-11-09 (connexion réservée aux adresses confirmées)
+- Un compte non confirmé ne peut plus se connecter (`403`) : « Renvoyer le lien » sur l'écran de connexion, mot de passe exigé. Le lien de confirmation connecte et ouvre l'app ; bandeau de rappel retiré. Les achats ne vérifient plus l'adresse (aucune session sans adresse confirmée). Doc : `comptes.md`, `api.md`, `paiement.md`.
+
+## 2026-11-09 (variante choisie absente de l'export)
+- Un montage périmé (variante de clip choisie, texte de voix modifié…) ne se valide plus tel quel : il faut le relancer. Avant, « Valider » gardait l'ancien rendu et « Exporter » téléchargeait la vidéo avec les anciens clips.
+- Valider les clips valide aussi les images de référence restées « à valider » : l'interface n'avait pas de bouton pour elles, et la pastille Clips restait orange. Doc : `api.md`, `admin.md`.
+
 ## 2026-11-08 (changement de forfait)
 - Un abonné PayPal peut changer de forfait (« Passer à ce forfait ») : le nouvel abonnement remplace l'ancien, annulé chez PayPal, dès son premier mois payé ; quota d'abonnement remplacé, recharges gardées. Annulation et changement demandent une confirmation. Doc : `abonnement.md`, `paiement.md`.
 

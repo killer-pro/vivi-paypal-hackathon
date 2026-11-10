@@ -94,7 +94,8 @@ async def _check_clips(session: AsyncSession, app_settings: AppSettings, owner: 
             await ensure_image_model_usable(registry, "gemini", image_model)
             image_usd = estimate_image_cost(image_model)
         return provider, await clip_scene_costs_usd(session, registry, project_id, provider, model, scene_id,
-                                                    skip_scene_ids, image_usd, pricing)
+                                                    skip_scene_ids, image_usd, pricing,
+                                                    await app_settings.get("lipsync_model"))
 
 
 async def _check_reference(app_settings: AppSettings, params: dict) -> str:

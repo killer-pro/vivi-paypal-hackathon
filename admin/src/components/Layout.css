@@ -190,18 +190,4 @@
 }
 
 /* Adresse non confirmée : une ligne teintée en tête de page, action à droite. */
-.verify-banner {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 14px;
-  margin-bottom: 20px;
-  padding: 8px 8px 8px 14px;
-  border-radius: var(--radius-m);
-  background: color-mix(in srgb, var(--st-awaiting) 10%, transparent);
-  font-size: 13px;
-}
 
-.verify-banner .btn {
-  margin-left: auto;
-}

@@ -2,11 +2,12 @@ import { useId, useState } from "react";
 import StepPanel, { type PanelProps } from "../StepPanel";
 import { locale, t } from "../../i18n";
 
-/** Styles de sous-titres : miroir de `SUBTITLE_STYLES` (backend `services/montage.py`). */
+/** Styles de sous-titres : miroir de `SUBTITLE_STYLES` (backend `services/montage.py`) ; `none` : aucun sous-titre. */
 const SUBTITLE_STYLES = [
   { value: "classic", label: t("Contour") },
   { value: "box", label: t("Boîte") },
   { value: "bold", label: t("Gros jaune") },
+  { value: "none", label: t("Sans") },
 ] as const;
 const DEFAULT_STYLE = "classic";
 
@@ -26,7 +27,7 @@ export default function MontagePanel(props: PanelProps) {
         {SUBTITLE_STYLES.map((o) => (
           <label key={o.value} className={`subtitle-style is-${o.value}`}>
             <input type="radio" name={name} checked={style === o.value} onChange={() => setPicked(o.value)} disabled={locked} />
-            <span className="subtitle-sample">{t("Ça change tout")}</span>
+            <span className="subtitle-sample">{o.value !== "none" && t("Ça change tout")}</span>
             <span className="subtitle-name">{o.label}</span>
           </label>
         ))}

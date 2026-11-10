@@ -82,8 +82,6 @@ async def checkout(body: CheckoutIn, user: User = Depends(current_user), session
                    stripe: StripeAPI = Depends(get_stripe)) -> dict:
     """Page de paiement Stripe de l'abonnement ou d'une recharge : renvoie son `url`. Rien n'est crédité ici : les crédits
     arrivent par le webhook signé, une fois le paiement confirmé."""
-    if user.email_verified_at is None:
-        raise HTTPException(403, "Confirmez votre adresse e-mail avant d'acheter")
     config = await load_billing(AppSettings(session))
     if body.kind == "subscription":
         plan: Pack = _tier_or_404(config, body.tier_id)
@@ -133,8 +131,6 @@ async def paypal_order(body: PayPalOrderIn, user: User = Depends(current_user), 
                        paypal: PayPalAPI = Depends(get_paypal)) -> dict:
     """Commande PayPal d'une recharge : renvoie l'`url` d'approbation. Rien n'est crédité ici : les crédits arrivent à la
     capture (retour sur `/plans`) ou par le webhook, une fois le paiement confirmé."""
-    if user.email_verified_at is None:
-        raise HTTPException(403, "Confirmez votre adresse e-mail avant d'acheter")
     pack = (await load_billing(AppSettings(session))).pack(body.pack_id)
     if pack is None:
         raise HTTPException(404, "Recharge inconnue")
@@ -183,8 +179,6 @@ async def paypal_subscription(body: PayPalSubscriptionIn, user: User = Depends(c
     crédits arrivent à la confirmation (retour sur `/plans`) ou par le webhook, une fois le premier mois prélevé. Un
     abonné peut changer de forfait : le nouvel abonnement remplace l'ancien une fois son premier mois payé (voir
     `payments.apply_paypal_subscription`) ; tant qu'il n'est pas approuvé, l'abonnement en cours ne change pas."""
-    if user.email_verified_at is None:
-        raise HTTPException(403, "Confirmez votre adresse e-mail avant d'acheter")
     plan = _tier_or_404(await load_billing(AppSettings(session)), body.tier_id)
     if not plan.paypal_subscribable:
         raise HTTPException(409, "Cette offre n'est pas disponible par PayPal")
